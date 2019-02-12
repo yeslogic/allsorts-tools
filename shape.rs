@@ -87,10 +87,9 @@ fn shape_ttf<'a>(
             Some(gdef_record) => Some(gdef_record.read_table(scope)?),
             None => None,
         };
-        let make_dotted_circle = || Vec::new(); // FIXME
         let vertical = false;
         let res = gsub_apply_default(
-            &make_dotted_circle,
+            &|| make_dotted_circle(&cmap_subtable),
             gsub_table_data,
             &opt_gdef_table,
             script,
@@ -108,21 +107,34 @@ fn shape_ttf<'a>(
     Ok(())
 }
 
+fn make_dotted_circle(cmap_subtable: &CmapSubtable) -> Vec<RawGlyph<()>> {
+    match map_glyph(cmap_subtable, '\u{25cc}') {
+        Ok(Some(raw_glyph)) => vec![raw_glyph],
+        _ => Vec::new(),
+    }
+}
+
 fn map_glyph(cmap_subtable: &CmapSubtable, ch: char) -> Result<Option<RawGlyph<()>>, ParseError> {
     if let Some(glyph_index) = cmap_subtable.map_glyph(ch as u32)? {
-        let glyph = RawGlyph {
-            unicodes: vec![ch],
-            glyph_index: Some(glyph_index),
-            liga_component_pos: 0,
-            glyph_origin: GlyphOrigin::Char(ch),
-            small_caps: false,
-            multi_subst_dup: false,
-            is_vert_alt: false,
-            extra_data: (),
-        };
+        let glyph = make_glyph(ch, glyph_index);
         Ok(Some(glyph))
     } else {
         Ok(None)
+    }
+}
+
+fn make_glyph(ch: char, glyph_index: u16) -> RawGlyph<()> {
+    RawGlyph {
+        unicodes: vec![ch],
+        glyph_index: Some(glyph_index),
+        liga_component_pos: 0,
+        glyph_origin: GlyphOrigin::Char(ch),
+        small_caps: false,
+        multi_subst_dup: false,
+        is_vert_alt: false,
+        fake_bold: false,
+        fake_italic: false,
+        extra_data: (),
     }
 }
 
