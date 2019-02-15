@@ -62,7 +62,7 @@ fn shape_ttf<'a>(
     lang: u32,
     text: &str,
 ) -> Result<(), ShapingError> {
-    let cmap = if let Some(cmap_scope) = load_table(scope, &ttf, tag('c', 'm', 'a', 'p'))? {
+    let cmap = if let Some(cmap_scope) = ttf.read_table(scope, tag('c', 'm', 'a', 'p'))? {
         cmap_scope.read::<Cmap>()?
     } else {
         println!("no cmap table");
@@ -84,13 +84,13 @@ fn shape_ttf<'a>(
     if let Some(gsub_record) = ttf.find_table_record(tag('G', 'S', 'U', 'B')) {
         let gsub_table_data = gsub_record.read_table(scope)?;
         let opt_gdef_table = match ttf.find_table_record(tag('G', 'D', 'E', 'F')) {
-            Some(gdef_record) => Some(gdef_record.read_table(scope)?),
+            Some(gdef_record) => Some(gdef_record.read_table(scope)?.data()),
             None => None,
         };
         let vertical = false;
         let res = gsub_apply_default(
             &|| make_dotted_circle(&cmap_subtable),
-            gsub_table_data,
+            gsub_table_data.data(),
             &opt_gdef_table,
             script,
             lang,
@@ -135,19 +135,6 @@ fn make_glyph(ch: char, glyph_index: u16) -> RawGlyph<()> {
         fake_bold: false,
         fake_italic: false,
         extra_data: (),
-    }
-}
-
-fn load_table<'a>(
-    scope: ReadScope<'a>,
-    ttf: &OffsetTable<'a>,
-    tag: u32,
-) -> Result<Option<ReadScope<'a>>, ParseError> {
-    if let Some(table_record) = ttf.find_table_record(tag) {
-        let table_data = table_record.read_table(scope)?;
-        Ok(Some(ReadScope::new(table_data)))
-    } else {
-        Ok(None)
     }
 }
 
