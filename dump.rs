@@ -1,3 +1,4 @@
+use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use fontcode::error::ParseError;
 use fontcode::opentype::tag;
 use fontcode::read::ReadScope;
@@ -78,11 +79,11 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>) -> Result<(), ParseE
                 .offset_length(offset, length)?
                 .data();
             let name = match (platform, encoding, language) {
-                (0, _, _) => get_utf16be(name_data),
-                (1, 0, _) => get_utf8(name_data), // FIXME MacRoman
-                (3, 0, _) => get_utf16be(name_data),
-                (3, 1, _) => get_utf16be(name_data),
-                (3, 10, _) => get_utf16be(name_data),
+                (0, _, _) => decode(&UTF_16BE, name_data),
+                (1, 0, _) => decode(&MACINTOSH, name_data),
+                (3, 0, _) => decode(&UTF_16BE, name_data),
+                (3, 1, _) => decode(&UTF_16BE, name_data),
+                (3, 10, _) => decode(&UTF_16BE, name_data),
                 _ => format!(
                     "(unknown platform={} encoding={} language={})",
                     platform, encoding, language
@@ -99,6 +100,7 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>) -> Result<(), ParseE
     Ok(())
 }
 
+#[allow(dead_code)]
 fn get_utf8(data: &[u8]) -> String {
     match str::from_utf8(data) {
         Ok(s) => String::from(s),
@@ -106,6 +108,7 @@ fn get_utf8(data: &[u8]) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn get_utf16be(data: &[u8]) -> String {
     if data.len() & 1 == 0 {
         let u16buf: Vec<u16> = data
@@ -118,6 +121,17 @@ fn get_utf16be(data: &[u8]) -> String {
         }
     } else {
         String::from("(not UTF-16BE)")
+    }
+}
+
+fn decode(encoding: &'static Encoding, data: &[u8]) -> String {
+    let mut decoder = encoding.new_decoder();
+    if let Some(size) = decoder.max_utf8_buffer_length(data.len()) {
+        let mut s = String::with_capacity(size);
+        let (_res, _read, _repl) = decoder.decode_to_string(data, &mut s, true);
+        s
+    } else {
+        String::new() // can only happen if buffer is enormous
     }
 }
 
