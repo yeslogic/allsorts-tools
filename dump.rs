@@ -100,30 +100,6 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>) -> Result<(), ParseE
     Ok(())
 }
 
-#[allow(dead_code)]
-fn get_utf8(data: &[u8]) -> String {
-    match str::from_utf8(data) {
-        Ok(s) => String::from(s),
-        Err(_) => format!("(not UTF-8: {:?})", data),
-    }
-}
-
-#[allow(dead_code)]
-fn get_utf16be(data: &[u8]) -> String {
-    if data.len() & 1 == 0 {
-        let u16buf: Vec<u16> = data
-            .chunks(2)
-            .map(|x| (u16::from(x[0]) << 8) | u16::from(x[1]))
-            .collect();
-        match String::from_utf16(u16buf.as_slice()) {
-            Ok(s) => s,
-            Err(_) => String::from("(not UTF-16BE)"),
-        }
-    } else {
-        String::from("(not UTF-16BE)")
-    }
-}
-
 fn decode(encoding: &'static Encoding, data: &[u8]) -> String {
     let mut decoder = encoding.new_decoder();
     if let Some(size) = decoder.max_utf8_buffer_length(data.len()) {
