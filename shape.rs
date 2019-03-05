@@ -91,7 +91,7 @@ fn shape_ttf<'a>(
         let res = gsub_apply_default(
             &|| make_dotted_circle(&cmap_subtable),
             gsub_table_data.data(),
-            &opt_gdef_table,
+            opt_gdef_table,
             script,
             lang,
             vertical,
