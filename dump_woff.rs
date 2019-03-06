@@ -63,7 +63,7 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>) -> Result<(), ParseErr
         .find(|entry| entry.tag == tag('n', 'a', 'm', 'e'))
     {
         let table = entry.read_table(woff.scope)?;
-        let name_table = ReadScope::new(&table).read::<NameTable>()?;
+        let name_table = table.scope().read::<NameTable>()?;
 
         for name_record in &name_table.name_records {
             let platform = name_record.platform_id;
