@@ -1,8 +1,10 @@
 use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use fontcode::error::ParseError;
+use fontcode::fontfile::FontFile;
 use fontcode::opentype::tag;
 use fontcode::read::ReadScope;
-use fontcode::tables::{NameTable, OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
+use fontcode::tables::{NameTable, OffsetTable, OpenTypeFont, TTCHeader};
+use fontcode::woff::WoffFile;
 use std::env;
 use std::fmt;
 use std::fs::File;
@@ -20,11 +22,12 @@ fn main() -> Result<(), ParseError> {
     let filename = &args[1];
     let buffer = read_file(filename)?;
 
-    let fontfile = ReadScope::new(&buffer).read::<OpenTypeFile>()?;
-
-    match fontfile.font {
-        OpenTypeFont::Single(ttf) => dump_ttf(fontfile.scope, ttf)?,
-        OpenTypeFont::Collection(ttc) => dump_ttc(fontfile.scope, ttc)?,
+    match ReadScope::new(&buffer).read::<FontFile>()? {
+        FontFile::OpenType(font_file) => match font_file.font {
+            OpenTypeFont::Single(ttf) => dump_ttf(font_file.scope, ttf)?,
+            OpenTypeFont::Collection(ttc) => dump_ttc(font_file.scope, ttc)?,
+        },
+        FontFile::Woff(woff_file) => dump_woff(woff_file.scope, woff_file)?,
     }
 
     Ok(())
@@ -68,35 +71,75 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>) -> Result<(), ParseE
     println!();
     if let Some(name_table_data) = ttf.read_table(scope, tag('n', 'a', 'm', 'e'))? {
         let name_table = name_table_data.read::<NameTable>()?;
-        for name_record in &name_table.name_records {
-            let platform = name_record.platform_id;
-            let encoding = name_record.encoding_id;
-            let language = name_record.language_id;
-            let offset = usize::from(name_record.offset);
-            let length = usize::from(name_record.length);
-            let name_data = name_table
-                .string_storage
-                .offset_length(offset, length)?
-                .data();
-            let name = match (platform, encoding, language) {
-                (0, _, _) => decode(&UTF_16BE, name_data),
-                (1, 0, _) => decode(&MACINTOSH, name_data),
-                (3, 0, _) => decode(&UTF_16BE, name_data),
-                (3, 1, _) => decode(&UTF_16BE, name_data),
-                (3, 10, _) => decode(&UTF_16BE, name_data),
-                _ => format!(
-                    "(unknown platform={} encoding={} language={})",
-                    platform, encoding, language
-                ),
-            };
-            match get_name_meaning(name_record.name_id) {
-                Some(meaning) => println!("{}", meaning,),
-                None => println!("name {}", name_record.name_id,),
-            }
-            println!("{:?}", name);
-            println!();
-        }
+        dump_name_table(&name_table)?;
     }
+    Ok(())
+}
+
+fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>) -> Result<(), ParseError> {
+    println!("TTF in WOFF");
+    println!(" - num_tables: {}\n", woff.table_directory.len());
+
+    for entry in &woff.table_directory {
+        println!(
+            "{} (original checksum: 0x{:08x}, compressed length: {} original length: {})",
+            DisplayTag(entry.tag),
+            entry.orig_checksum,
+            entry.comp_length,
+            entry.orig_length
+        );
+        let _table = entry.read_table(scope)?;
+    }
+
+    let metadata = woff.extended_metadata()?;
+    if let Some(metadata) = metadata {
+        println!("\nExtended Metadata:\n{}", metadata);
+    }
+
+    println!();
+    if let Some(entry) = woff
+        .table_directory
+        .iter()
+        .find(|entry| entry.tag == tag('n', 'a', 'm', 'e'))
+    {
+        let table = entry.read_table(woff.scope)?;
+        let name_table = table.scope().read::<NameTable>()?;
+        dump_name_table(&name_table)?;
+    }
+
+    Ok(())
+}
+
+fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
+    for name_record in &name_table.name_records {
+        let platform = name_record.platform_id;
+        let encoding = name_record.encoding_id;
+        let language = name_record.language_id;
+        let offset = usize::from(name_record.offset);
+        let length = usize::from(name_record.length);
+        let name_data = name_table
+            .string_storage
+            .offset_length(offset, length)?
+            .data();
+        let name = match (platform, encoding, language) {
+            (0, _, _) => decode(&UTF_16BE, name_data),
+            (1, 0, _) => decode(&MACINTOSH, name_data),
+            (3, 0, _) => decode(&UTF_16BE, name_data),
+            (3, 1, _) => decode(&UTF_16BE, name_data),
+            (3, 10, _) => decode(&UTF_16BE, name_data),
+            _ => format!(
+                "(unknown platform={} encoding={} language={})",
+                platform, encoding, language
+            ),
+        };
+        match get_name_meaning(name_record.name_id) {
+            Some(meaning) => println!("{}", meaning,),
+            None => println!("name {}", name_record.name_id,),
+        }
+        println!("{:?}", name);
+        println!();
+    }
+
     Ok(())
 }
 
