@@ -1,9 +1,9 @@
 use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use fontcode::error::ParseError;
 use fontcode::fontfile::FontFile;
-use fontcode::opentype::tag;
 use fontcode::read::ReadScope;
 use fontcode::tables::{NameTable, OffsetTable, OpenTypeFont, TTCHeader};
+use fontcode::tag;
 use fontcode::woff::WoffFile;
 use std::env;
 use std::fmt;
@@ -69,7 +69,7 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>) -> Result<(), ParseE
         let _table = table_record.read_table(scope)?;
     }
     println!();
-    if let Some(name_table_data) = ttf.read_table(scope, tag('n', 'a', 'm', 'e'))? {
+    if let Some(name_table_data) = ttf.read_table(scope, tag!(b"name"))? {
         let name_table = name_table_data.read::<NameTable>()?;
         dump_name_table(&name_table)?;
     }
@@ -100,7 +100,7 @@ fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>) -> Result<(), ParseEr
     if let Some(entry) = woff
         .table_directory
         .iter()
-        .find(|entry| entry.tag == tag('n', 'a', 'm', 'e'))
+        .find(|entry| entry.tag == tag!(b"name"))
     {
         let table = entry.read_table(woff.scope)?;
         let name_table = table.scope().read::<NameTable>()?;

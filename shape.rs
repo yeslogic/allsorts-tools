@@ -2,9 +2,9 @@ use fontcode::cmap::{Cmap, CmapSubtable};
 use fontcode::error::{ParseError, ShapingError};
 use fontcode::glyph_index::read_cmap_subtable;
 use fontcode::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
-use fontcode::opentype::tag;
 use fontcode::read::ReadScope;
 use fontcode::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
+use fontcode::tag;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read};
@@ -62,7 +62,7 @@ fn shape_ttf<'a>(
     lang: u32,
     text: &str,
 ) -> Result<(), ShapingError> {
-    let cmap = if let Some(cmap_scope) = ttf.read_table(scope, tag('c', 'm', 'a', 'p'))? {
+    let cmap = if let Some(cmap_scope) = ttf.read_table(scope, tag!(b"cmap"))? {
         cmap_scope.read::<Cmap>()?
     } else {
         println!("no cmap table");
@@ -81,9 +81,9 @@ fn shape_ttf<'a>(
     let opt_glyphs = opt_glyphs_res?;
     let mut glyphs = opt_glyphs.into_iter().flatten().collect();
     println!("glyphs before: {:?}", glyphs);
-    if let Some(gsub_record) = ttf.find_table_record(tag('G', 'S', 'U', 'B')) {
+    if let Some(gsub_record) = ttf.find_table_record(tag!(b"GSUB")) {
         let gsub_table_data = gsub_record.read_table(scope)?;
-        let opt_gdef_table = match ttf.find_table_record(tag('G', 'D', 'E', 'F')) {
+        let opt_gdef_table = match ttf.find_table_record(tag!(b"GDEF")) {
             Some(gdef_record) => Some(gdef_record.read_table(scope)?.data()),
             None => None,
         };
