@@ -62,7 +62,7 @@ fn shape_ttf<'a>(
     lang: u32,
     text: &str,
 ) -> Result<(), ShapingError> {
-    let cmap = if let Some(cmap_scope) = ttf.read_table(scope, tag!(b"cmap"))? {
+    let cmap = if let Some(cmap_scope) = ttf.read_table(scope, tag::CMAP)? {
         cmap_scope.read::<Cmap>()?
     } else {
         println!("no cmap table");
@@ -81,9 +81,9 @@ fn shape_ttf<'a>(
     let opt_glyphs = opt_glyphs_res?;
     let mut glyphs = opt_glyphs.into_iter().flatten().collect();
     println!("glyphs before: {:?}", glyphs);
-    if let Some(gsub_record) = ttf.find_table_record(tag!(b"GSUB")) {
+    if let Some(gsub_record) = ttf.find_table_record(tag::GSUB) {
         let gsub_table_data = gsub_record.read_table(scope)?;
-        let opt_gdef_table = match ttf.find_table_record(tag!(b"GDEF")) {
+        let opt_gdef_table = match ttf.find_table_record(tag::GDEF) {
             Some(gdef_record) => Some(gdef_record.read_table(scope)?.data()),
             None => None,
         };
