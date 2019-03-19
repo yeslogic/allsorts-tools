@@ -5,6 +5,7 @@ use fontcode::read::ReadScope;
 use fontcode::tables::{NameTable, OffsetTable, OpenTypeFont, TTCHeader};
 use fontcode::tag;
 use fontcode::woff::WoffFile;
+use fontcode::woff2::{GlyfTable, Woff2File, Woff2GlyfTable};
 use std::env;
 use std::fmt;
 use std::fs::File;
@@ -28,6 +29,7 @@ fn main() -> Result<(), ParseError> {
             OpenTypeFont::Collection(ttc) => dump_ttc(font_file.scope, ttc)?,
         },
         FontFile::Woff(woff_file) => dump_woff(woff_file.scope, woff_file)?,
+        FontFile::Woff2(woff_file) => dump_woff2(woff_file.scope, woff_file)?,
     }
 
     Ok(())
@@ -105,6 +107,47 @@ fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>) -> Result<(), ParseEr
         let table = entry.read_table(woff.scope)?;
         let name_table = table.scope().read::<NameTable>()?;
         dump_name_table(&name_table)?;
+    }
+
+    Ok(())
+}
+
+fn dump_woff2<'a>(scope: ReadScope<'a>, woff: Woff2File<'a>) -> Result<(), ParseError> {
+    println!("TTF in WOFF2");
+    println!(" - num_tables: {}", woff.table_directory.len());
+    println!(
+        " - sizeof font data: {} compressed {} uncompressed\n",
+        woff.woff_header.total_compressed_size,
+        woff.table_data_block.len()
+    );
+
+    for entry in &woff.table_directory {
+        println!("{} {:?}", DisplayTag(entry.tag), entry,);
+    }
+
+    let metadata = woff.extended_metadata()?;
+    if let Some(metadata) = metadata {
+        println!("\nExtended Metadata:\n{}", metadata);
+    }
+
+    for entry in &woff.table_directory {
+        let table = entry.read_table(woff.table_data_block_scope())?;
+        match entry.tag {
+            tag::GLYF => {
+                println!();
+                let glyf = table.scope().read_dep::<Woff2GlyfTable>(&entry)?;
+                println!("Read glyf table with {} glyphs:", glyf.glyphs.len());
+                for glyph in glyf.glyphs {
+                    println!("- {:?}", glyph);
+                }
+            }
+            tag::NAME => {
+                println!();
+                let name_table = table.scope().read::<NameTable>()?;
+                dump_name_table(&name_table)?;
+            }
+            _ => (),
+        }
     }
 
     Ok(())
