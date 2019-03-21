@@ -2,10 +2,11 @@ use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use fontcode::error::ParseError;
 use fontcode::fontfile::FontFile;
 use fontcode::read::ReadScope;
+use fontcode::tables::glyf::GlyfTable;
 use fontcode::tables::{NameTable, OffsetTable, OpenTypeFont, TTCHeader};
 use fontcode::tag;
 use fontcode::woff::WoffFile;
-use fontcode::woff2::{GlyfTable, Woff2File, Woff2GlyfTable};
+use fontcode::woff2::{Woff2File, Woff2GlyfTable};
 use std::env;
 use std::fmt;
 use std::fs::File;
@@ -136,8 +137,8 @@ fn dump_woff2<'a>(scope: ReadScope<'a>, woff: Woff2File<'a>) -> Result<(), Parse
             tag::GLYF => {
                 println!();
                 let glyf = table.scope().read_dep::<Woff2GlyfTable>(&entry)?;
-                println!("Read glyf table with {} glyphs:", glyf.glyphs.len());
-                for glyph in glyf.glyphs {
+                println!("Read glyf table with {} glyphs:", glyf.records.len());
+                for glyph in glyf.records {
                     println!("- {:?}", glyph);
                 }
             }
