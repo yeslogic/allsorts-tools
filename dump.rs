@@ -2,7 +2,6 @@ use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use fontcode::error::ParseError;
 use fontcode::fontfile::FontFile;
 use fontcode::read::ReadScope;
-use fontcode::tables::glyf::GlyfTable;
 use fontcode::tables::{NameTable, OffsetTable, OpenTypeFont, TTCHeader};
 use fontcode::tag;
 use fontcode::woff::WoffFile;
