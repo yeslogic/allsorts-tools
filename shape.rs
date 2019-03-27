@@ -2,7 +2,7 @@ use fontcode::cmap::{Cmap, CmapSubtable};
 use fontcode::error::{ParseError, ShapingError};
 use fontcode::glyph_index::read_cmap_subtable;
 use fontcode::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
-use fontcode::layout::{GDEFTable, LayoutTable, LayoutTableType};
+use fontcode::layout::{GDEFTable, LayoutTable, GSUB};
 use fontcode::read::ReadScope;
 use fontcode::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use fontcode::tag;
@@ -83,26 +83,20 @@ fn shape_ttf<'a>(
     let mut glyphs = opt_glyphs.into_iter().flatten().collect();
     println!("glyphs before: {:?}", glyphs);
     if let Some(gsub_record) = ttf.find_table_record(tag::GSUB) {
-        let gsub_table_data = gsub_record.read_table(scope)?.data();
-        let opt_gdef_table_data = match ttf.find_table_record(tag::GDEF) {
-            Some(gdef_record) => Some(gdef_record.read_table(scope)?.data()),
+        let gsub_table = gsub_record.read_table(scope)?.read::<LayoutTable<GSUB>>()?;
+        let opt_gdef_table = match ttf.find_table_record(tag::GDEF) {
+            Some(gdef_record) => Some(gdef_record.read_table(scope)?.read::<GDEFTable>()?),
             None => None,
         };
         let vertical = false;
-        let res = with_tables(
-            gsub_table_data,
-            opt_gdef_table_data,
-            |gsub_table, opt_gdef_table| {
-                gsub_apply_default(
-                    &|| make_dotted_circle(&cmap_subtable),
-                    &gsub_table,
-                    opt_gdef_table,
-                    script,
-                    lang,
-                    vertical,
-                    &mut glyphs,
-                )
-            },
+        let res = gsub_apply_default(
+            &|| make_dotted_circle(&cmap_subtable),
+            &gsub_table,
+            opt_gdef_table.as_ref(),
+            script,
+            lang,
+            vertical,
+            &mut glyphs,
         )?;
         println!("res: {}", res);
         if res {
@@ -112,21 +106,6 @@ fn shape_ttf<'a>(
         println!("no GSUB table");
     }
     Ok(())
-}
-
-fn with_tables<T: LayoutTableType, Ret>(
-    layout_table_data: &[u8],
-    opt_gdef_table_data: Option<&[u8]>,
-    f: impl FnOnce(&LayoutTable<T>, Option<&GDEFTable>) -> Result<Ret, ShapingError>,
-) -> Result<Ret, ShapingError> {
-    let layout_table = ReadScope::new(layout_table_data).read::<LayoutTable<T>>()?;
-    match opt_gdef_table_data {
-        Some(gdef_table_data) => {
-            let gdef_table = ReadScope::new(gdef_table_data).read::<GDEFTable>()?;
-            f(&layout_table, Some(&gdef_table))
-        }
-        None => f(&layout_table, None),
-    }
 }
 
 fn make_dotted_circle(cmap_subtable: &CmapSubtable) -> Vec<RawGlyph<()>> {
