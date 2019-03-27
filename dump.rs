@@ -29,7 +29,7 @@ fn main() -> Result<(), ParseError> {
             OpenTypeFont::Collection(ttc) => dump_ttc(font_file.scope, ttc)?,
         },
         FontFile::Woff(woff_file) => dump_woff(woff_file.scope, woff_file)?,
-        FontFile::Woff2(woff_file) => dump_woff2(woff_file.scope, woff_file)?,
+        FontFile::Woff2(woff_file) => dump_woff2(woff_file.table_data_block_scope(), &woff_file)?,
     }
 
     Ok(())
@@ -112,7 +112,7 @@ fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>) -> Result<(), ParseEr
     Ok(())
 }
 
-fn dump_woff2<'a>(scope: ReadScope<'a>, woff: Woff2File<'a>) -> Result<(), ParseError> {
+fn dump_woff2<'a>(scope: ReadScope<'a>, woff: &Woff2File<'a>) -> Result<(), ParseError> {
     println!("TTF in WOFF2");
     println!(" - num_tables: {}", woff.table_directory.len());
     println!(
@@ -131,7 +131,7 @@ fn dump_woff2<'a>(scope: ReadScope<'a>, woff: Woff2File<'a>) -> Result<(), Parse
     }
 
     for entry in &woff.table_directory {
-        let table = entry.read_table(woff.table_data_block_scope())?;
+        let table = entry.read_table(scope)?;
         match entry.tag {
             tag::GLYF => {
                 println!();
