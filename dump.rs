@@ -2,10 +2,13 @@ use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use fontcode::error::ParseError;
 use fontcode::fontfile::FontFile;
 use fontcode::read::ReadScope;
-use fontcode::tables::{NameTable, OffsetTable, OpenTypeFont, TTCHeader};
+use fontcode::tables::glyf::GlyfTable;
+use fontcode::tables::{
+    HeadTable, LocaTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader,
+};
 use fontcode::tag;
 use fontcode::woff::WoffFile;
-use fontcode::woff2::{Woff2File, Woff2GlyfTable};
+use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 use std::env;
 use std::fmt;
 use std::fs::File;
@@ -130,24 +133,40 @@ fn dump_woff2<'a>(scope: ReadScope<'a>, woff: &Woff2File<'a>) -> Result<(), Pars
         println!("\nExtended Metadata:\n{}", metadata);
     }
 
-    for entry in &woff.table_directory {
+    if let Some(entry) = woff.find_table_entry(tag::GLYF) {
+        println!();
         let table = entry.read_table(scope)?;
-        match entry.tag {
-            tag::GLYF => {
-                println!();
-                let glyf = table.scope().read_dep::<Woff2GlyfTable>(&entry)?;
-                println!("Read glyf table with {} glyphs:", glyf.records.len());
-                for glyph in glyf.records {
-                    println!("- {:?}", glyph);
-                }
-            }
-            tag::NAME => {
-                println!();
-                let name_table = table.scope().read::<NameTable>()?;
-                dump_name_table(&name_table)?;
-            }
-            _ => (),
+        let head = woff
+            .read_table(tag::HEAD)?
+            .ok_or(ParseError::BadValue)?
+            .scope()
+            .read::<HeadTable>()?;
+        let maxp = woff
+            .read_table(tag::MAXP)?
+            .ok_or(ParseError::BadValue)?
+            .scope()
+            .read::<MaxpTable>()?;
+        let loca_entry = woff
+            .find_table_entry(tag::LOCA)
+            .ok_or(ParseError::BadValue)?;
+        let loca = loca_entry.read_table(woff.table_data_block_scope())?;
+        let loca = loca.scope().read_dep::<Woff2LocaTable>((
+            &loca_entry,
+            usize::from(maxp.num_glyphs),
+            head.index_to_loc_format,
+        ))?;
+        let glyf = table.scope().read_dep::<Woff2GlyfTable>((&entry, loca))?;
+
+        println!("Read glyf table with {} glyphs:", glyf.records.len());
+        for glyph in glyf.records {
+            println!("- {:?}", glyph);
         }
+    }
+
+    if let Some(table) = woff.read_table(tag::NAME)? {
+        println!();
+        let name_table = table.scope().read::<NameTable>()?;
+        dump_name_table(&name_table)?;
     }
 
     Ok(())
