@@ -1,8 +1,9 @@
 use fontcode::cmap::{Cmap, CmapSubtable};
 use fontcode::error::{ParseError, ShapingError};
 use fontcode::glyph_index::read_cmap_subtable;
+use fontcode::gpos::{gpos_apply, Info};
 use fontcode::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
-use fontcode::layout::{GDEFTable, LayoutTable, GSUB};
+use fontcode::layout::{GDEFTable, LayoutTable, GPOS, GSUB};
 use fontcode::read::ReadScope;
 use fontcode::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use fontcode::tag;
@@ -88,6 +89,10 @@ fn shape_ttf<'a>(
             Some(gdef_record) => Some(gdef_record.read_table(scope)?.read::<GDEFTable>()?),
             None => None,
         };
+        let opt_gpos_table = match ttf.find_table_record(tag::GPOS) {
+            Some(gpos_record) => Some(gpos_record.read_table(scope)?.read::<LayoutTable<GPOS>>()?),
+            None => None,
+        };
         let vertical = false;
         let res = gsub_apply_default(
             &|| make_dotted_circle(&cmap_subtable),
@@ -101,6 +106,21 @@ fn shape_ttf<'a>(
         println!("res: {}", res);
         if res {
             println!("glyphs after: {:?}", glyphs);
+        }
+        match opt_gpos_table {
+            Some(gpos_table) => {
+                let kerning = true;
+                let mut infos = Info::init_from_glyphs(opt_gdef_table.as_ref(), glyphs)?;
+                gpos_apply(
+                    &gpos_table,
+                    opt_gdef_table.as_ref(),
+                    kerning,
+                    script,
+                    lang,
+                    &mut infos,
+                )?;
+            }
+            None => {}
         }
     } else {
         println!("no GSUB table");
