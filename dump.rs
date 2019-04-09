@@ -43,17 +43,7 @@ fn main() -> Result<(), Error> {
         return Ok(());
     }
 
-    let table = match matches.opt_str("t") {
-        Some(ref table) if table.len() > 0 && table.len() <= 4 => {
-            let mut tag = [b" "[0]; 4];
-            for (i, byte) in table.bytes().take(4).enumerate() {
-                tag[i] = byte;
-            }
-            Some(tag::tag(tag))
-        }
-        Some(_) => return Err(Error::Message("Argument to -t must be 1 to 4 characters long.")),
-        None => None,
-    };
+    let table = matches.opt_str("t").map(|table| tag::from_string(&table)).transpose()?;
 
     if table.is_some() && atty::is(Stream::Stdout) {
         return Err(Error::Message("Not printing binary data to tty."));
@@ -110,7 +100,7 @@ fn dump_ttc<'a>(scope: ReadScope<'a>, ttc: TTCHeader<'a>, tag: Option<Tag>) -> R
 
 fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>, tag: Option<Tag>) -> Result<(), Error> {
     if let Some(tag) = tag {
-        return dump_raw_table(tag, ttf.read_table(scope, tag)?);
+        return dump_raw_table(ttf.read_table(scope, tag)?);
     }
 
     println!("TTF");
@@ -139,7 +129,7 @@ fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>, tag: Option<Tag>) -> 
         if let Some(entry) = woff.table_directory.iter().find(|entry| entry.tag == tag) {
             let table = entry.read_table(woff.scope)?;
 
-            return dump_raw_table(tag, Some(table.scope()));
+            return dump_raw_table(Some(table.scope()));
         } else {
             eprintln!("Table {} not found", DisplayTag(tag));
         }
@@ -186,8 +176,8 @@ fn dump_woff2<'a>(
     tag: Option<Tag>,
 ) -> Result<(), Error> {
     if let Some(tag) = tag {
-        let table = woff.read_table(tag::NAME)?;
-        return dump_raw_table(tag, table.as_ref().map(|buf| buf.scope()));
+        let table = woff.read_table(tag)?;
+        return dump_raw_table(table.as_ref().map(|buf| buf.scope()));
     }
 
     println!("TTF in WOFF2");
@@ -279,7 +269,7 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
     Ok(())
 }
 
-fn dump_raw_table(tag: Tag, scope: Option<ReadScope>) -> Result<(), Error> {
+fn dump_raw_table(scope: Option<ReadScope>) -> Result<(), Error> {
     if let Some(scope) = scope {
         io::stdout().write_all(scope.data()).map_err(Error::from)
     } else {

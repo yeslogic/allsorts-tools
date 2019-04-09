@@ -20,8 +20,8 @@ fn main() -> Result<(), ShapingError> {
     }
 
     let filename = &args[1];
-    let script = tag_from_string(&args[2])?;
-    let lang = tag_from_string(&args[3])?;
+    let script = tag::from_string(&args[2])?;
+    let lang = tag::from_string(&args[3])?;
     let text = &args[4];
     let buffer = read_file(filename)?;
 
@@ -159,26 +159,3 @@ fn make_glyph(ch: char, glyph_index: u16) -> RawGlyph<()> {
     }
 }
 
-fn tag_from_string(s: &str) -> Result<u32, ParseError> {
-    if s.len() > 4 {
-        return Err(ParseError::BadValue);
-    }
-
-    let mut tag: u32 = 0;
-    let mut count = 0;
-
-    for c in s.chars() {
-        if !c.is_ascii() || c.is_ascii_control() {
-            return Err(ParseError::BadValue);
-        }
-
-        tag = (tag << 8) | (c as u32);
-        count += 1;
-    }
-
-    while count < 4 {
-        tag = (tag << 8) | (' ' as u32);
-    }
-
-    Ok(tag)
-}
