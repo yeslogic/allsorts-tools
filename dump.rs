@@ -10,15 +10,22 @@ use fontcode::tag;
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
+use std::env;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::str;
-use std::{env, process};
 
 type Tag = u32;
 
-fn main() -> Result<(), ParseError> {
+#[derive(Debug)]
+enum Error {
+    Io(io::Error),
+    Parse(ParseError),
+    Message(&'static str),
+}
+
+fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
 
@@ -36,17 +43,20 @@ fn main() -> Result<(), ParseError> {
         return Ok(());
     }
 
-    let table = matches.opt_str("t").map(|table| {
-        let mut tag = [0u8; 4];
-        for (i, byte) in table.bytes().take(4).enumerate() {
-            tag[i] = byte;
+    let table = match matches.opt_str("t") {
+        Some(ref table) if table.len() > 0 && table.len() <= 4 => {
+            let mut tag = [b" "[0]; 4];
+            for (i, byte) in table.bytes().take(4).enumerate() {
+                tag[i] = byte;
+            }
+            Some(tag::tag(tag))
         }
-        tag::tag(tag)
-    });
+        Some(_) => return Err(Error::Message("Argument to -t must be 1 to 4 characters long.")),
+        None => None,
+    };
 
     if table.is_some() && atty::is(Stream::Stdout) {
-        eprintln!("Not printing binary data to tty.");
-        process::exit(1);
+        return Err(Error::Message("Not printing binary data to tty."));
     }
 
     let filename = if !matches.free.is_empty() {
@@ -84,11 +94,7 @@ fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
     Ok(buffer)
 }
 
-fn dump_ttc<'a>(
-    scope: ReadScope<'a>,
-    ttc: TTCHeader<'a>,
-    tag: Option<Tag>,
-) -> Result<(), ParseError> {
+fn dump_ttc<'a>(scope: ReadScope<'a>, ttc: TTCHeader<'a>, tag: Option<Tag>) -> Result<(), Error> {
     println!("TTC");
     println!(" - version: {}.{}", ttc.major_version, ttc.minor_version);
     println!(" - num_fonts: {}", ttc.offset_tables.len());
@@ -102,13 +108,9 @@ fn dump_ttc<'a>(
     Ok(())
 }
 
-fn dump_ttf<'a>(
-    scope: ReadScope<'a>,
-    ttf: OffsetTable<'a>,
-    tag: Option<Tag>,
-) -> Result<(), ParseError> {
+fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>, tag: Option<Tag>) -> Result<(), Error> {
     if let Some(tag) = tag {
-        return dump_raw_table(tag, ttf.read_table(scope, tag)?).map_err(ParseError::from);
+        return dump_raw_table(tag, ttf.read_table(scope, tag)?);
     }
 
     println!("TTF");
@@ -132,16 +134,12 @@ fn dump_ttf<'a>(
     Ok(())
 }
 
-fn dump_woff<'a>(
-    scope: ReadScope<'a>,
-    woff: WoffFile<'a>,
-    tag: Option<Tag>,
-) -> Result<(), ParseError> {
+fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>, tag: Option<Tag>) -> Result<(), Error> {
     if let Some(tag) = tag {
         if let Some(entry) = woff.table_directory.iter().find(|entry| entry.tag == tag) {
             let table = entry.read_table(woff.scope)?;
 
-            return dump_raw_table(tag, Some(table.scope())).map_err(ParseError::from);
+            return dump_raw_table(tag, Some(table.scope()));
         } else {
             eprintln!("Table {} not found", DisplayTag(tag));
         }
@@ -186,10 +184,10 @@ fn dump_woff2<'a>(
     scope: ReadScope<'a>,
     woff: &Woff2File<'a>,
     tag: Option<Tag>,
-) -> Result<(), ParseError> {
+) -> Result<(), Error> {
     if let Some(tag) = tag {
         let table = woff.read_table(tag::NAME)?;
-        return dump_raw_table(tag, table.as_ref().map(|buf| buf.scope())).map_err(ParseError::from);
+        return dump_raw_table(tag, table.as_ref().map(|buf| buf.scope()));
     }
 
     println!("TTF in WOFF2");
@@ -281,14 +279,12 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
     Ok(())
 }
 
-fn dump_raw_table(tag: Tag, scope: Option<ReadScope>) -> Result<(), io::Error> {
+fn dump_raw_table(tag: Tag, scope: Option<ReadScope>) -> Result<(), Error> {
     if let Some(scope) = scope {
-        io::stdout().write_all(scope.data())?;
+        io::stdout().write_all(scope.data()).map_err(Error::from)
     } else {
-        eprintln!("Table {} not found", DisplayTag(tag));
+        Err(Error::Message("Table not found"))
     }
-
-    Ok(())
 }
 
 fn decode(encoding: &'static Encoding, data: &[u8]) -> String {
@@ -349,5 +345,17 @@ impl fmt::Display for DisplayTag {
         } else {
             s.fmt(f)
         }
+    }
+}
+
+impl From<ParseError> for Error {
+    fn from(err: ParseError) -> Self {
+        Error::Parse(err)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Self {
+        Error::Io(err)
     }
 }
