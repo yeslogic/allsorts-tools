@@ -43,7 +43,10 @@ fn main() -> Result<(), Error> {
         return Ok(());
     }
 
-    let table = matches.opt_str("t").map(|table| tag::from_string(&table)).transpose()?;
+    let table = matches
+        .opt_str("t")
+        .map(|table| tag::from_string(&table))
+        .transpose()?;
 
     if table.is_some() && atty::is(Stream::Stdout) {
         return Err(Error::Message("Not printing binary data to tty."));

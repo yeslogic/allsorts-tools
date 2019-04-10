@@ -158,4 +158,3 @@ fn make_glyph(ch: char, glyph_index: u16) -> RawGlyph<()> {
         extra_data: (),
     }
 }
-
