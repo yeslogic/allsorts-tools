@@ -1,10 +1,10 @@
-use fontcode::cmap::{Cmap, CmapSubtable};
 use fontcode::error::{ParseError, ShapingError};
 use fontcode::glyph_index::read_cmap_subtable;
 use fontcode::gpos::{gpos_apply, Info};
 use fontcode::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
 use fontcode::layout::{GDEFTable, LayoutTable, GPOS, GSUB};
 use fontcode::read::ReadScope;
+use fontcode::tables::cmap::{Cmap, CmapSubtable};
 use fontcode::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use fontcode::tag;
 use std::env;
