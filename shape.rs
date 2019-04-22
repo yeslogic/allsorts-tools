@@ -2,7 +2,7 @@ use fontcode::error::{ParseError, ShapingError};
 use fontcode::font_data_impl::read_cmap_subtable;
 use fontcode::gpos::{gpos_apply, Info};
 use fontcode::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
-use fontcode::layout::{GDEFTable, LayoutTable, GPOS, GSUB};
+use fontcode::layout::{new_layout_cache, GDEFTable, LayoutTable, GPOS, GSUB};
 use fontcode::read::ReadScope;
 use fontcode::tables::cmap::{Cmap, CmapSubtable};
 use fontcode::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
@@ -65,6 +65,8 @@ fn shape_ttf<'a>(
     lang: u32,
     text: &str,
 ) -> Result<(), ShapingError> {
+    let gsub_cache = new_layout_cache::<GSUB>();
+    let gpos_cache = new_layout_cache::<GPOS>();
     let cmap = if let Some(cmap_scope) = ttf.read_table(&scope, tag::CMAP)? {
         cmap_scope.read::<Cmap>()?
     } else {
@@ -103,6 +105,7 @@ fn shape_ttf<'a>(
         let vertical = false;
         gsub_apply_default(
             &|| make_dotted_circle(&cmap_subtable),
+            &gsub_cache,
             &gsub_table,
             opt_gdef_table.as_ref(),
             script,
@@ -116,6 +119,7 @@ fn shape_ttf<'a>(
                 let kerning = true;
                 let mut infos = Info::init_from_glyphs(opt_gdef_table.as_ref(), glyphs)?;
                 gpos_apply(
+                    &gpos_cache,
                     &gpos_table,
                     opt_gdef_table.as_ref(),
                     kerning,
