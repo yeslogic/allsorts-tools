@@ -115,7 +115,8 @@ fn subset_ttf<'a>(
     );
 
     // Subset
-    let new_font = font_file.subset(&glyph_ids)?;
+    let mut cmap0 = Box::new([0u8; 256]); // FIXME: How to generate this?
+    let new_font = font_file.subset(&glyph_ids, cmap0)?;
 
     // Write out the new font
     let mut output = File::create(output_path)?;
