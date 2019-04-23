@@ -4,16 +4,15 @@ use getopts::Options;
 use fontcode::error::{ParseError, ReadWriteError};
 use fontcode::fontfile::FontFile;
 use fontcode::read::ReadScope;
-use fontcode::tables::{
-    HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader,
-};
-use fontcode::tag;
+use fontcode::tables::{HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFile, OpenTypeFont};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
+use fontcode::{macroman, tag};
 
 use fontcode::glyph_index::read_cmap_subtable;
 use fontcode::gsub::{GlyphOrigin, RawGlyph};
-use fontcode::tables::cmap::{owned, Cmap, CmapSubtable};
+use fontcode::tables::cmap::{Cmap, CmapSubtable};
+use itertools::Itertools;
 use std::env;
 use std::fmt;
 use std::fs::File;
@@ -100,22 +99,40 @@ fn subset_ttf<'a>(
     };
 
     let glyphs = chars_to_glyphs(font_file.scope, &ttf, script, lang, text)?;
-    let glyph_ids = glyphs
+    let mut glyph_ids = glyphs
         .iter()
         .flat_map(|glyph| glyph.as_ref().and_then(|raw_glyph| raw_glyph.glyph_index))
         .collect::<Vec<_>>();
-
+    glyph_ids.sort();
+    let glyph_ids = glyph_ids.into_iter().dedup().collect::<Vec<_>>();
     if glyph_ids.is_empty() {
         return Err(Error::Message("no glyphs left in font"));
     }
-    println!("Number of glpyhs in new font: {}", glyph_ids.len());
-    println!(
-        "Size of CmapSubtable: {}",
-        std::mem::size_of::<owned::CmapSubtable>()
-    );
+
+    println!("Number of glyphs in new font: {}", glyph_ids.len());
 
     // Subset
-    let mut cmap0 = Box::new([0u8; 256]); // FIXME: How to generate this?
+    let cmap0 = if glyphs.iter().all(is_macroman) {
+        let mut cmap0 = [0; 256];
+        glyphs
+            .iter()
+            .enumerate()
+            .for_each(|(glyph_index, glyph)| match glyph {
+                Some(RawGlyph {
+                    glyph_origin: GlyphOrigin::Char(chr),
+                    ..
+                }) => {
+                    cmap0[usize::from(macroman::char_to_macroman(*chr).unwrap())] =
+                        glyph_index as u8
+                }
+                _ => unreachable!(),
+            });
+        Some(Box::new(cmap0))
+    } else {
+        // TODO: Handle this
+        return Err(Error::Message("not mac roman compatible"));
+    };
+
     let new_font = font_file.subset(&glyph_ids, cmap0)?;
 
     // Write out the new font
@@ -335,6 +352,16 @@ fn get_name_meaning(name_id: u16) -> Option<&'static str> {
         24 => Some("Dark Background Palette"),
         25 => Some("Variations PostScript Name Prefix"),
         _ => None,
+    }
+}
+
+fn is_macroman(glyph: &Option<RawGlyph<()>>) -> bool {
+    match glyph {
+        Some(RawGlyph {
+            glyph_origin: GlyphOrigin::Char(chr),
+            ..
+        }) => macroman::is_macroman(*chr),
+        _ => false,
     }
 }
 
