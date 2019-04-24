@@ -151,7 +151,7 @@ fn subset_ttf<'a>(
 
     // Write out the new font
     let mut output = File::create(output_path)?;
-    output.write_all(new_font.bytes())?;
+    output.write_all(&new_font)?;
 
     Ok(())
 }
