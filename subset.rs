@@ -61,8 +61,6 @@ fn main() -> Result<(), Error> {
 
     let input = matches.free[0].as_str();
     let output = matches.free[1].as_str();
-
-    // Work out the glyphs we want to keep from the text
     let buffer = read_file(input)?;
 
     match ReadScope::new(&buffer).read::<FontFile>()? {
@@ -98,7 +96,22 @@ fn subset_ttf<'a>(
         OpenTypeFont::Collection(_ttc) => unimplemented!(),
     };
 
-    let glyphs = chars_to_glyphs(font_file.scope, &ttf, script, lang, text)?;
+    // Work out the glyphs we want to keep from the text
+    let mut glyphs = chars_to_glyphs(font_file.scope, &ttf, script, lang, text)?;
+    let notdef = RawGlyph {
+        unicodes: vec![],
+        glyph_index: Some(0),
+        liga_component_pos: 0,
+        glyph_origin: GlyphOrigin::Direct,
+        small_caps: false,
+        multi_subst_dup: false,
+        is_vert_alt: false,
+        fake_bold: false,
+        fake_italic: false,
+        extra_data: (),
+    };
+    glyphs.insert(0, Some(notdef));
+
     let mut glyph_ids = glyphs
         .iter()
         .flat_map(|glyph| glyph.as_ref().and_then(|raw_glyph| raw_glyph.glyph_index))
@@ -112,10 +125,11 @@ fn subset_ttf<'a>(
     println!("Number of glyphs in new font: {}", glyph_ids.len());
 
     // Subset
-    let cmap0 = if glyphs.iter().all(is_macroman) {
+    let cmap0 = if glyphs.iter().skip(1).all(is_macroman) {
         let mut cmap0 = [0; 256];
         glyphs
             .iter()
+            .skip(1)
             .enumerate()
             .for_each(|(glyph_index, glyph)| match glyph {
                 Some(RawGlyph {
@@ -123,7 +137,7 @@ fn subset_ttf<'a>(
                     ..
                 }) => {
                     cmap0[usize::from(macroman::char_to_macroman(*chr).unwrap())] =
-                        glyph_index as u8
+                        glyph_index as u8 + 1
                 }
                 _ => unreachable!(),
             });
