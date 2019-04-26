@@ -6,12 +6,12 @@ use fontcode::error::ParseError;
 use fontcode::fontfile::FontFile;
 use fontcode::read::ReadScope;
 use fontcode::tables::{HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader};
-use fontcode::tag;
+use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
 use std::env;
-use std::fmt;
+
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::str;
@@ -320,24 +320,6 @@ fn get_name_meaning(name_id: u16) -> Option<&'static str> {
         24 => Some("Dark Background Palette"),
         25 => Some("Variations PostScript Name Prefix"),
         _ => None,
-    }
-}
-
-struct DisplayTag(u32);
-
-impl fmt::Display for DisplayTag {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tag = self.0;
-        let mut s = String::with_capacity(4);
-        s.push(char::from((tag >> 24) as u8));
-        s.push(char::from(((tag >> 16) & 255) as u8));
-        s.push(char::from(((tag >> 8) & 255) as u8));
-        s.push(char::from((tag & 255) as u8));
-        if s.chars().any(|c| !c.is_ascii() || c.is_ascii_control()) {
-            write!(f, "0x{:08x}", tag)
-        } else {
-            s.fmt(f)
-        }
     }
 }
 
