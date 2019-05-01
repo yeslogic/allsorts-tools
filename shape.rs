@@ -65,8 +65,6 @@ fn shape_ttf<'a>(
     lang: u32,
     text: &str,
 ) -> Result<(), ShapingError> {
-    let gsub_cache = new_layout_cache::<GSUB>();
-    let gpos_cache = new_layout_cache::<GPOS>();
     let cmap = if let Some(cmap_scope) = ttf.read_table(&scope, tag::CMAP)? {
         cmap_scope.read::<Cmap>()?
     } else {
@@ -87,26 +85,24 @@ fn shape_ttf<'a>(
     let mut glyphs = opt_glyphs.into_iter().flatten().collect();
     println!("glyphs before: {:?}", glyphs);
     if let Some(gsub_record) = ttf.find_table_record(tag::GSUB) {
-        let gsub_table = gsub_record
-            .read_table(&scope)?
-            .read::<LayoutTable<GSUB>>()?;
+        let gsub_table = gsub_record.read_table(scope)?.read::<LayoutTable<GSUB>>()?;
+        let gsub_cache = new_layout_cache::<GSUB>(gsub_table);
         let opt_gdef_table = match ttf.find_table_record(tag::GDEF) {
-            Some(gdef_record) => Some(gdef_record.read_table(&scope)?.read::<GDEFTable>()?),
+            Some(gdef_record) => Some(gdef_record.read_table(scope)?.read::<GDEFTable>()?),
             None => None,
         };
-        let opt_gpos_table = match ttf.find_table_record(tag::GPOS) {
-            Some(gpos_record) => Some(
-                gpos_record
-                    .read_table(&scope)?
-                    .read::<LayoutTable<GPOS>>()?,
-            ),
+        let opt_gpos_cache = match ttf.find_table_record(tag::GPOS) {
+            Some(gpos_record) => {
+                let gpos_table = gpos_record.read_table(scope)?.read::<LayoutTable<GPOS>>()?;
+                let gpos_cache = new_layout_cache::<GPOS>(gpos_table);
+                Some(gpos_cache)
+            }
             None => None,
         };
         let vertical = false;
         gsub_apply_default(
             &|| make_dotted_circle(&cmap_subtable),
             &gsub_cache,
-            &gsub_table,
             opt_gdef_table.as_ref(),
             script,
             lang,
@@ -114,13 +110,12 @@ fn shape_ttf<'a>(
             &mut glyphs,
         )?;
         println!("glyphs after: {:?}", glyphs);
-        match opt_gpos_table {
-            Some(gpos_table) => {
+        match opt_gpos_cache {
+            Some(gpos_cache) => {
                 let kerning = true;
                 let mut infos = Info::init_from_glyphs(opt_gdef_table.as_ref(), glyphs)?;
                 gpos_apply(
                     &gpos_cache,
-                    &gpos_table,
                     opt_gdef_table.as_ref(),
                     kerning,
                     script,
