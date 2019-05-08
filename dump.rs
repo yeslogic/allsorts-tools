@@ -11,10 +11,9 @@ use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
 use std::env;
-
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::str;
+use std::str::{self, FromStr};
 
 type Tag = u32;
 
@@ -31,6 +30,7 @@ fn main() -> Result<(), Error> {
 
     let mut opts = Options::new();
     opts.optopt("t", "table", "dump the content of this table", "TABLE");
+    opts.optopt("i", "index", "index of the font to dump (for TTC)", "INDEX");
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -47,10 +47,16 @@ fn main() -> Result<(), Error> {
         .opt_str("t")
         .map(|table| tag::from_string(&table))
         .transpose()?;
-
     if table.is_some() && atty::is(Stream::Stdout) {
         return Err(Error::Message("Not printing binary data to tty."));
     }
+
+    let index = matches
+        .opt_str("i")
+        .map(|index| usize::from_str(&index))
+        .transpose()
+        .map_err(|_err| ParseError::BadValue)?
+        .unwrap_or_default();
 
     let filename = if !matches.free.is_empty() {
         matches.free[0].as_str()
@@ -68,7 +74,7 @@ fn main() -> Result<(), Error> {
         },
         FontFile::Woff(woff_file) => dump_woff(woff_file.scope, woff_file, table)?,
         FontFile::Woff2(woff_file) => {
-            dump_woff2(woff_file.table_data_block_scope(), &woff_file, table)?
+            dump_woff2(woff_file.table_data_block_scope(), &woff_file, table, index)?
         }
     }
 
@@ -177,14 +183,18 @@ fn dump_woff2<'a>(
     scope: ReadScope<'a>,
     woff: &Woff2File<'a>,
     tag: Option<Tag>,
+    index: usize,
 ) -> Result<(), Error> {
     if let Some(tag) = tag {
-        let table = woff.read_table(tag, 0)?;
+        let table = woff.read_table(tag, index)?;
         return dump_raw_table(table.as_ref().map(|buf| buf.scope()));
     }
 
     println!("TTF in WOFF2");
-    println!(" - num_tables: {}", woff.table_directory.len());
+    println!(" - num tables: {}", woff.table_directory.len());
+    if let Some(collection_directory) = &woff.collection_directory {
+        println!(" - num fonts: {}", collection_directory.fonts().count());
+    }
     println!(
         " - sizeof font data: {} compressed {} uncompressed\n",
         woff.woff_header.total_compressed_size,
@@ -200,21 +210,21 @@ fn dump_woff2<'a>(
         println!("\nExtended Metadata:\n{}", metadata);
     }
 
-    if let Some(entry) = woff.find_table_entry(tag::GLYF, 0) {
+    if let Some(entry) = woff.find_table_entry(tag::GLYF, index) {
         println!();
         let table = entry.read_table(scope)?;
         let head = woff
-            .read_table(tag::HEAD, 0)?
+            .read_table(tag::HEAD, index)?
             .ok_or(ParseError::BadValue)?
             .scope()
             .read::<HeadTable>()?;
         let maxp = woff
-            .read_table(tag::MAXP, 0)?
+            .read_table(tag::MAXP, index)?
             .ok_or(ParseError::BadValue)?
             .scope()
             .read::<MaxpTable>()?;
         let loca_entry = woff
-            .find_table_entry(tag::LOCA, 0)
+            .find_table_entry(tag::LOCA, index)
             .ok_or(ParseError::BadValue)?;
         let loca = loca_entry.read_table(woff.table_data_block_scope())?;
         let loca = loca.scope().read_dep::<Woff2LocaTable>((
@@ -230,7 +240,7 @@ fn dump_woff2<'a>(
         }
     }
 
-    if let Some(table) = woff.read_table(tag::NAME, 0)? {
+    if let Some(table) = woff.read_table(tag::NAME, index)? {
         println!();
         let name_table = table.scope().read::<NameTable>()?;
         dump_name_table(&name_table)?;
