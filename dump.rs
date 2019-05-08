@@ -179,7 +179,7 @@ fn dump_woff2<'a>(
     tag: Option<Tag>,
 ) -> Result<(), Error> {
     if let Some(tag) = tag {
-        let table = woff.read_table(tag)?;
+        let table = woff.read_table(tag, 0)?;
         return dump_raw_table(table.as_ref().map(|buf| buf.scope()));
     }
 
@@ -200,21 +200,21 @@ fn dump_woff2<'a>(
         println!("\nExtended Metadata:\n{}", metadata);
     }
 
-    if let Some(entry) = woff.find_table_entry(tag::GLYF) {
+    if let Some(entry) = woff.find_table_entry(tag::GLYF, 0) {
         println!();
         let table = entry.read_table(scope)?;
         let head = woff
-            .read_table(tag::HEAD)?
+            .read_table(tag::HEAD, 0)?
             .ok_or(ParseError::BadValue)?
             .scope()
             .read::<HeadTable>()?;
         let maxp = woff
-            .read_table(tag::MAXP)?
+            .read_table(tag::MAXP, 0)?
             .ok_or(ParseError::BadValue)?
             .scope()
             .read::<MaxpTable>()?;
         let loca_entry = woff
-            .find_table_entry(tag::LOCA)
+            .find_table_entry(tag::LOCA, 0)
             .ok_or(ParseError::BadValue)?;
         let loca = loca_entry.read_table(woff.table_data_block_scope())?;
         let loca = loca.scope().read_dep::<Woff2LocaTable>((
@@ -230,7 +230,7 @@ fn dump_woff2<'a>(
         }
     }
 
-    if let Some(table) = woff.read_table(tag::NAME)? {
+    if let Some(table) = woff.read_table(tag::NAME, 0)? {
         println!();
         let name_table = table.scope().read::<NameTable>()?;
         dump_name_table(&name_table)?;
