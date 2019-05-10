@@ -2,12 +2,12 @@ use getopts::Options;
 
 use fontcode::error::{ParseError, ReadWriteError};
 use fontcode::fontfile::FontFile;
-use fontcode::macroman;
 use fontcode::read::ReadScope;
 use fontcode::tables::{OffsetTable, OpenTypeFile, OpenTypeFont};
 use fontcode::tag;
 use fontcode::woff::WoffFile;
 use fontcode::woff2::Woff2File;
+use fontcode::{macroman, subset};
 
 use fontcode::glyph_index::read_cmap_subtable;
 use fontcode::gsub::{GlyphOrigin, RawGlyph};
@@ -145,7 +145,8 @@ fn subset_ttf<'a>(
         return Err(Error::Message("not mac roman compatible"));
     };
 
-    let new_font = font_file.subset(&glyph_ids, cmap0)?;
+    let font_provider = font_file.font_provider(0)?;
+    let new_font = subset::subset(&font_provider, &glyph_ids, cmap0)?;
 
     // Write out the new font
     let mut output = File::create(output_path)?;
