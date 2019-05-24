@@ -3,13 +3,16 @@ use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use getopts::Options;
 
 use fontcode::error::ParseError;
+use fontcode::font_tables;
 use fontcode::fontfile::FontFile;
 use fontcode::read::ReadScope;
+use fontcode::tables::loca::LocaTable;
 use fontcode::tables::{HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader};
 use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
+use std::borrow::Borrow;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -31,6 +34,7 @@ fn main() -> Result<(), Error> {
     let mut opts = Options::new();
     opts.optopt("t", "table", "dump the content of this table", "TABLE");
     opts.optopt("i", "index", "index of the font to dump (for TTC)", "INDEX");
+    opts.optflag("l", "loca", "print the loca table");
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -67,14 +71,18 @@ fn main() -> Result<(), Error> {
 
     let buffer = read_file(filename)?;
 
-    match ReadScope::new(&buffer).read::<FontFile>()? {
-        FontFile::OpenType(font_file) => match font_file.font {
-            OpenTypeFont::Single(ttf) => dump_ttf(font_file.scope, ttf, table)?,
-            OpenTypeFont::Collection(ttc) => dump_ttc(font_file.scope, ttc, table)?,
-        },
-        FontFile::Woff(woff_file) => dump_woff(woff_file.scope, woff_file, table)?,
-        FontFile::Woff2(woff_file) => {
-            dump_woff2(woff_file.table_data_block_scope(), &woff_file, table, index)?
+    if matches.opt_present("l") {
+        dump_loca_table(&buffer, index)?;
+    } else {
+        match ReadScope::new(&buffer).read::<FontFile>()? {
+            FontFile::OpenType(font_file) => match font_file.font {
+                OpenTypeFont::Single(ttf) => dump_ttf(font_file.scope, ttf, table)?,
+                OpenTypeFont::Collection(ttc) => dump_ttc(font_file.scope, ttc, table)?,
+            },
+            FontFile::Woff(woff_file) => dump_woff(woff_file.scope, woff_file, table)?,
+            FontFile::Woff2(woff_file) => {
+                dump_woff2(woff_file.table_data_block_scope(), &woff_file, table, index)?
+            }
         }
     }
 
@@ -118,9 +126,10 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>, tag: Option<Tag>) ->
     println!();
     for table_record in &ttf.table_records {
         println!(
-            "{} (checksum: 0x{:08x}, length: {})",
+            "{} (checksum: 0x{:08x}, offset: {}, length: {})",
             DisplayTag(table_record.table_tag),
             table_record.checksum,
+            table_record.offset,
             table_record.length
         );
         let _table = table_record.read_table(scope)?;
@@ -277,6 +286,31 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
         }
         println!("{:?}", name);
         println!();
+    }
+
+    Ok(())
+}
+
+fn dump_loca_table(buffer: &[u8], index: usize) -> Result<(), ParseError> {
+    let font = font_tables::FontImpl::new(&buffer, index).unwrap();
+    let provider = font_tables::FontTablesImpl::FontImpl(font);
+
+    let table = provider.get_table(tag::HEAD).expect("no head table");
+    let scope = ReadScope::new(table.borrow());
+    let head = scope.read::<HeadTable>()?;
+
+    let table = provider.get_table(tag::MAXP).expect("no maxp table");
+    let scope = ReadScope::new(table.borrow());
+    let maxp = scope.read::<MaxpTable>()?;
+
+    let table = provider.get_table(tag::LOCA).expect("no loca table");
+    let scope = ReadScope::new(table.borrow());
+    let loca =
+        scope.read_dep::<LocaTable>((usize::from(maxp.num_glyphs), head.index_to_loc_format))?;
+
+    println!("loca:");
+    for (glyph_id, offset) in loca.offsets.iter().enumerate() {
+        println!("{}: {}", glyph_id, offset);
     }
 
     Ok(())
