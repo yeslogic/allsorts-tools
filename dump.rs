@@ -6,6 +6,7 @@ use fontcode::error::ParseError;
 use fontcode::font_tables;
 use fontcode::fontfile::FontFile;
 use fontcode::read::ReadScope;
+use fontcode::tables::glyf::GlyfTable;
 use fontcode::tables::loca::LocaTable;
 use fontcode::tables::{HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader};
 use fontcode::tag::{self, DisplayTag};
@@ -34,6 +35,7 @@ fn main() -> Result<(), Error> {
     let mut opts = Options::new();
     opts.optopt("t", "table", "dump the content of this table", "TABLE");
     opts.optopt("i", "index", "index of the font to dump (for TTC)", "INDEX");
+    opts.optopt("g", "glyph", "dump the specified glyph", "INDEX");
     opts.optflag("l", "loca", "print the loca table");
     opts.optflag("h", "help", "print this help menu");
 
@@ -73,6 +75,8 @@ fn main() -> Result<(), Error> {
 
     if matches.opt_present("l") {
         dump_loca_table(&buffer, index)?;
+    } else if let Ok(Some(glyph_id)) = matches.opt_get::<u16>("g") {
+        dump_glyph(&buffer, index, glyph_id)?;
     } else {
         match ReadScope::new(&buffer).read::<FontFile>()? {
             FontFile::OpenType(font_file) => match font_file.font {
@@ -312,6 +316,36 @@ fn dump_loca_table(buffer: &[u8], index: usize) -> Result<(), ParseError> {
     for (glyph_id, offset) in loca.offsets.iter().enumerate() {
         println!("{}: {}", glyph_id, offset);
     }
+
+    Ok(())
+}
+
+fn dump_glyph(buffer: &[u8], index: usize, glyph_id: u16) -> Result<(), ParseError> {
+    let font = font_tables::FontImpl::new(&buffer, index).unwrap();
+    let provider = font_tables::FontTablesImpl::FontImpl(font);
+
+    let table = provider.get_table(tag::HEAD).expect("no head table");
+    let scope = ReadScope::new(table.borrow());
+    let head = scope.read::<HeadTable>()?;
+
+    let table = provider.get_table(tag::MAXP).expect("no maxp table");
+    let scope = ReadScope::new(table.borrow());
+    let maxp = scope.read::<MaxpTable>()?;
+
+    let table = provider.get_table(tag::LOCA).expect("no loca table");
+    let scope = ReadScope::new(table.borrow());
+    let loca =
+        scope.read_dep::<LocaTable>((usize::from(maxp.num_glyphs), head.index_to_loc_format))?;
+
+    let table = provider.get_table(tag::GLYF).expect("no glyf table");
+    let scope = ReadScope::new(table.borrow());
+    let glyf = scope.read_dep::<GlyfTable>(loca)?;
+
+    let glyph = glyf
+        .records
+        .get(usize::from(glyph_id))
+        .ok_or(ParseError::BadValue)?;
+    println!("{:#?}", glyph.clone().parse()?);
 
     Ok(())
 }
