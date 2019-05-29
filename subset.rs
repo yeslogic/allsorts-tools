@@ -1,20 +1,18 @@
 use getopts::Options;
 
 use fontcode::error::{ParseError, ReadWriteError};
-use fontcode::fontfile::FontFile;
-use fontcode::read::ReadScope;
-use fontcode::tables::{OffsetTable, OpenTypeFile, OpenTypeFont};
-use fontcode::tag;
-use fontcode::woff::WoffFile;
-use fontcode::woff2::Woff2File;
-use fontcode::{macroman, subset};
-
+use fontcode::font_tables::{FontImpl, FontTablesImpl};
 use fontcode::glyph_index::read_cmap_subtable;
 use fontcode::gsub::{GlyphOrigin, RawGlyph};
+use fontcode::read::ReadScope;
 use fontcode::tables::cmap::{Cmap, CmapSubtable};
+use fontcode::tables::FontTableProvider;
+use fontcode::tag;
+use fontcode::{macroman, subset};
 use itertools::Itertools;
-use std::env;
 
+use std::borrow::Cow;
+use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::str;
@@ -63,11 +61,9 @@ fn main() -> Result<(), Error> {
     let output = matches.free[1].as_str();
     let buffer = read_file(input)?;
 
-    match ReadScope::new(&buffer).read::<FontFile>()? {
-        FontFile::OpenType(font_file) => subset_ttf(&font_file, &text, output)?,
-        FontFile::Woff(woff_file) => subset_woff(woff_file.scope, woff_file)?,
-        FontFile::Woff2(woff_file) => subset_woff2(woff_file.table_data_block_scope(), &woff_file)?,
-    }
+    let font = FontImpl::new(&buffer, 0).unwrap();
+    let provider = FontTablesImpl::FontImpl(font);
+    subset(&provider, &text, output)?;
 
     Ok(())
 }
@@ -84,18 +80,13 @@ fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
     Ok(buffer)
 }
 
-fn subset_ttf<'a>(
-    font_file: &'a OpenTypeFile<'a>,
+fn subset<'a, F: FontTableProvider>(
+    font_provider: &F,
     text: &str,
     output_path: &str,
 ) -> Result<(), Error> {
-    let ttf = match &font_file.font {
-        OpenTypeFont::Single(ttf) => ttf,
-        OpenTypeFont::Collection(_ttc) => unimplemented!(),
-    };
-
     // Work out the glyphs we want to keep from the text
-    let mut glyphs = chars_to_glyphs(font_file.scope, &ttf, text)?;
+    let mut glyphs = chars_to_glyphs(font_provider, text)?;
     let notdef = RawGlyph {
         unicodes: vec![],
         glyph_index: Some(0),
@@ -141,12 +132,10 @@ fn subset_ttf<'a>(
             });
         Some(Box::new(cmap0))
     } else {
-        // TODO: Handle this
         return Err(Error::Message("not mac roman compatible"));
     };
 
-    let font_provider = font_file.font_provider(0)?;
-    let new_font = subset::subset(&font_provider, &glyph_ids, cmap0)?;
+    let new_font = subset::subset(font_provider, &glyph_ids, cmap0)?;
 
     // Write out the new font
     let mut output = File::create(output_path)?;
@@ -155,23 +144,12 @@ fn subset_ttf<'a>(
     Ok(())
 }
 
-fn subset_woff<'a>(_scope: ReadScope<'a>, _woff: WoffFile<'a>) -> Result<(), Error> {
-    unimplemented!()
-}
-
-fn subset_woff2<'a>(_scope: ReadScope<'a>, _woff: &Woff2File<'a>) -> Result<(), Error> {
-    unimplemented!()
-}
-
-fn chars_to_glyphs<'a>(
-    scope: ReadScope<'a>,
-    ttf: &OffsetTable<'a>,
+fn chars_to_glyphs<'a, F: FontTableProvider>(
+    font_provider: &F,
     text: &str,
 ) -> Result<Vec<Option<RawGlyph<()>>>, Error> {
-    let cmap = ttf
-        .read_table(scope, tag::CMAP)?
-        .ok_or(Error::Message("no cmap table"))?
-        .read::<Cmap>()?;
+    let cmap_data = read_table_data(font_provider, tag::CMAP)?;
+    let cmap = ReadScope::new(&cmap_data).read::<Cmap>()?;
     let cmap_subtable =
         read_cmap_subtable(&cmap)?.ok_or(Error::Message("no suitable cmap sub-table found"))?;
 
@@ -181,6 +159,13 @@ fn chars_to_glyphs<'a>(
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(glyphs)
+}
+
+fn read_table_data<'a, F: FontTableProvider>(
+    provider: &'a F,
+    tag: u32,
+) -> Result<Cow<'a, [u8]>, ParseError> {
+    provider.table_data(tag)?.ok_or(ParseError::MissingValue)
 }
 
 fn map_glyph(cmap_subtable: &CmapSubtable, ch: char) -> Result<Option<RawGlyph<()>>, ParseError> {
