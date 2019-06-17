@@ -1,5 +1,5 @@
 use fontcode::error::{ParseError, ShapingError};
-use fontcode::glyph_index::read_cmap_subtable;
+use fontcode::font_cmap::read_cmap_subtable;
 use fontcode::gpos::{gpos_apply, Info};
 use fontcode::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
 use fontcode::layout::{GDEFTable, LayoutTable, GPOS, GSUB};

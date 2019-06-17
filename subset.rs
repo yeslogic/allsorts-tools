@@ -1,8 +1,8 @@
 use getopts::Options;
 
 use fontcode::error::{ParseError, ReadWriteError};
+use fontcode::font_cmap::read_cmap_subtable;
 use fontcode::font_tables::{FontImpl, FontTablesImpl};
-use fontcode::glyph_index::read_cmap_subtable;
 use fontcode::gsub::{GlyphOrigin, RawGlyph};
 use fontcode::read::ReadScope;
 use fontcode::tables::cmap::{Cmap, CmapSubtable};
