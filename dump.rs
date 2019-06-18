@@ -13,6 +13,7 @@ use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
+use fontcode::cff::CFF;
 use std::borrow::Borrow;
 use std::env;
 use std::fs::File;
@@ -137,6 +138,11 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>, tag: Option<Tag>) ->
             table_record.length
         );
         let _table = table_record.read_table(scope)?;
+    }
+    if let Some(cff_table_data) = ttf.read_table(scope, tag::CFF)? {
+        println!();
+        let cff_table = cff_table_data.read::<CFF>()?;
+        dump_cff_table(&cff_table)?;
     }
     println!();
     if let Some(name_table_data) = ttf.read_table(scope, tag::NAME)? {
@@ -316,6 +322,19 @@ fn dump_loca_table(buffer: &[u8], index: usize) -> Result<(), ParseError> {
     for (glyph_id, offset) in loca.offsets.iter().enumerate() {
         println!("{}: {}", glyph_id, offset);
     }
+
+    Ok(())
+}
+
+fn dump_cff_table(cff: &CFF) -> Result<(), ParseError> {
+    println!("- CFF:");
+    println!(" - version: {}.{}", cff.header.major, cff.header.minor);
+    for obj in cff.name_index.iter() {
+        let name = String::from_utf8_lossy(obj);
+        println!(" - name: {}", name);
+    }
+
+    // TODO: Print the Top DICT
 
     Ok(())
 }
