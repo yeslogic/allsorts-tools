@@ -13,7 +13,7 @@ use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
-use fontcode::cff::CFF;
+use fontcode::cff::{self, Op1, Operand, Operator, CFF};
 use std::borrow::Borrow;
 use std::env;
 use std::fs::File;
@@ -141,8 +141,7 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>, tag: Option<Tag>) ->
     }
     if let Some(cff_table_data) = ttf.read_table(scope, tag::CFF)? {
         println!();
-        let cff_table = cff_table_data.read::<CFF>()?;
-        dump_cff_table(&cff_table)?;
+        dump_cff_table(cff_table_data)?;
     }
     println!();
     if let Some(name_table_data) = ttf.read_table(scope, tag::NAME)? {
@@ -326,7 +325,9 @@ fn dump_loca_table(buffer: &[u8], index: usize) -> Result<(), ParseError> {
     Ok(())
 }
 
-fn dump_cff_table(cff: &CFF) -> Result<(), ParseError> {
+fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
+    let cff = scope.read::<CFF>()?;
+
     println!("- CFF:");
     println!(" - version: {}.{}", cff.header.major, cff.header.minor);
     for obj in cff.name_index.iter() {
@@ -334,7 +335,24 @@ fn dump_cff_table(cff: &CFF) -> Result<(), ParseError> {
         println!(" - name: {}", name);
     }
 
-    // TODO: Print the Top DICT
+    if cff.name_index.count != 1 {
+        return Err(ParseError::BadIndex);
+    }
+    let top_dict = cff.top_dict(0)?;
+
+    let char_strings_operands = top_dict
+        .get(Operator::Op1(Op1::CharStrings))
+        .ok_or(ParseError::MissingValue)?;
+    let char_strings_index = match char_strings_operands {
+        [Operand::Integer(offset)] => scope.offset(*offset as usize).read::<cff::Index<'_>>(),
+        _ => Err(ParseError::BadValue),
+    }?;
+    println!(" - num glyphs: {}", char_strings_index.count);
+    println!();
+    println!(" - Top DICT");
+    for (op, operands) in top_dict.iter() {
+        println!("  - {:?}: {:?}", op, operands);
+    }
 
     Ok(())
 }
