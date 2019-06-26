@@ -7,6 +7,7 @@ use fontcode::read::ReadScope;
 use fontcode::tables::cmap::{Cmap, CmapSubtable};
 use fontcode::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use fontcode::tag;
+use std::convert::TryFrom;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read};
@@ -50,7 +51,7 @@ fn shape_ttc<'a>(
     text: &str,
 ) -> Result<(), ShapingError> {
     for offset_table_offset in &ttc.offset_tables {
-        let offset_table_offset = offset_table_offset as usize; // FIXME range
+        let offset_table_offset = usize::try_from(offset_table_offset).map_err(ParseError::from)?;
         let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
         shape_ttf(scope, offset_table, script, lang, text)?;
     }

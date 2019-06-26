@@ -15,6 +15,7 @@ use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
 use fontcode::cff::{self, CFFVariant, Op1, Operand, Operator, CFF};
 use std::borrow::Borrow;
+use std::convert::TryFrom;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -112,7 +113,7 @@ fn dump_ttc<'a>(scope: ReadScope<'a>, ttc: TTCHeader<'a>, tag: Option<Tag>) -> R
     println!(" - num_fonts: {}", ttc.offset_tables.len());
     println!();
     for offset_table_offset in &ttc.offset_tables {
-        let offset_table_offset = offset_table_offset as usize; // FIXME range
+        let offset_table_offset = usize::try_from(offset_table_offset).map_err(ParseError::from)?;
         let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
         dump_ttf(scope, offset_table, tag)?;
     }
