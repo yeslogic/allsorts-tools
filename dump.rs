@@ -343,7 +343,9 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
 
     let char_strings_operands = top_dict.get(Operator::Op1(Op1::CharStrings))?;
     let char_strings_index = match char_strings_operands {
-        [Operand::Integer(offset)] => scope.offset(*offset as usize).read::<cff::Index<'_>>(),
+        [Operand::Integer(offset)] => scope
+            .offset(usize::try_from(*offset)?)
+            .read::<cff::Index<'_>>(),
         _ => Err(ParseError::BadValue),
     }?;
     println!(" - num glyphs: {}", char_strings_index.count);
