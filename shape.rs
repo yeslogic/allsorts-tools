@@ -51,7 +51,7 @@ fn shape_ttc<'a>(
     text: &str,
 ) -> Result<(), ShapingError> {
     for offset_table_offset in &ttc.offset_tables {
-        let offset_table_offset = usize::try_from(offset_table_offset).map_err(ParseError::from)?;
+        let offset_table_offset = usize::try_from(offset_table_offset)?;
         let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
         shape_ttf(scope, offset_table, script, lang, text)?;
     }
