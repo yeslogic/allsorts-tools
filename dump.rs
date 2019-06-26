@@ -13,7 +13,7 @@ use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
-use fontcode::cff::{self, CFFVariant, Op1, Operand, Operator, CFF};
+use fontcode::cff::{self, CFFVariant, Charset, Op1, Operand, Operator, CFF};
 use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::env;
@@ -349,6 +349,17 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
         _ => Err(ParseError::BadValue),
     }?;
     println!(" - num glyphs: {}", char_strings_index.count);
+    for charset in cff.charsets.iter() {
+        println!(
+            " - charset: {}",
+            match charset {
+                Charset::ISOAdobe => "ISO Adobe",
+                Charset::Expert => "Expert",
+                Charset::ExpertSubset => "Expert Subset",
+                Charset::Custom(_) => "Custom",
+            }
+        );
+    }
     for data in cff.data.iter() {
         println!(
             " - variant: {}",
