@@ -369,22 +369,24 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
             CFFVariant::Type1(_) => "Type 1",
         }
     );
-    println!(
-        " - subrs: {}",
-        match font.local_subr_index {
-            Some(ref index) => index.count,
-            None => 0,
-        }
-    );
     println!();
     println!(" - Top DICT");
     for (op, operands) in font.top_dict.iter() {
         println!("  - {:?}: {:?}", op, operands);
     }
-    println!();
-    println!(" - Private DICT");
-    for (op, operands) in font.private_dict.iter() {
-        println!("  - {:?}: {:?}", op, operands);
+    if let CFFVariant::Type1(ref type1) = font.data {
+        println!();
+        println!(" - Private DICT");
+        for (op, operands) in type1.private_dict.iter() {
+            println!("  - {:?}: {:?}", op, operands);
+        }
+        println!(
+            " - subrs: {}",
+            match type1.local_subr_index {
+                Some(ref index) => index.count,
+                None => 0,
+            }
+        );
     }
 
     Ok(())
