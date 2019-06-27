@@ -13,7 +13,7 @@ use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
-use fontcode::cff::{self, CFFVariant, Charset, Op1, Operator, CFF};
+use fontcode::cff::{self, CFFVariant, Charset, FontDict, Op1, Operator, CFF};
 use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::env;
@@ -374,19 +374,31 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     for (op, operands) in font.top_dict.iter() {
         println!("  - {:?}: {:?}", op, operands);
     }
-    if let CFFVariant::Type1(ref type1) = font.data {
-        println!();
-        println!(" - Private DICT");
-        for (op, operands) in type1.private_dict.iter() {
-            println!("  - {:?}: {:?}", op, operands);
-        }
-        println!(
-            " - subrs: {}",
-            match type1.local_subr_index {
-                Some(ref index) => index.count,
-                None => 0,
+    match &font.data {
+        CFFVariant::Type1(ref type1) => {
+            println!();
+            println!(" - Private DICT");
+            for (op, operands) in type1.private_dict.iter() {
+                println!("  - {:?}: {:?}", op, operands);
             }
-        );
+            println!(
+                " - subrs: {}",
+                match type1.local_subr_index {
+                    Some(ref index) => index.count,
+                    None => 0,
+                }
+            );
+        }
+        CFFVariant::CID(cid) => {
+            println!();
+            for (i, object) in cid.font_dict_index.iter().enumerate() {
+                println!(" - Font DICT {}", i);
+                let font_dict = ReadScope::new(object).read::<FontDict>()?;
+                for (op, operands) in font_dict.iter() {
+                    println!("  - {:?}: {:?}", op, operands);
+                }
+            }
+        }
     }
 
     Ok(())
