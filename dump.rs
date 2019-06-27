@@ -344,9 +344,8 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     if cff.name_index.count != 1 {
         return Err(ParseError::BadIndex);
     }
-    let top_dict = cff.top_dict(0)?;
-
-    let char_strings_operands = top_dict.get(Operator::Op1(Op1::CharStrings))?;
+    let font = cff.font(0).ok_or(ParseError::MissingValue)?;
+    let char_strings_operands = font.top_dict.get(Operator::Op1(Op1::CharStrings))?;
     let char_strings_index = match char_strings_operands {
         [Operand::Integer(offset)] => scope
             .offset(usize::try_from(*offset)?)
@@ -354,34 +353,30 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
         _ => Err(ParseError::BadValue),
     }?;
     println!(" - num glyphs: {}", char_strings_index.count);
-    for charset in cff.charsets.iter() {
-        println!(
-            " - charset: {}",
-            match charset {
-                Charset::ISOAdobe => "ISO Adobe",
-                Charset::Expert => "Expert",
-                Charset::ExpertSubset => "Expert Subset",
-                Charset::Custom(_) => "Custom",
-            }
-        );
-    }
-    for data in cff.data.iter() {
-        println!(
-            " - variant: {}",
-            match data {
-                CFFVariant::CID(_) => "CID",
-                CFFVariant::Type1(_) => "Type 1",
-            }
-        );
-    }
+    println!(
+        " - charset: {}",
+        match font.charset {
+            Charset::ISOAdobe => "ISO Adobe",
+            Charset::Expert => "Expert",
+            Charset::ExpertSubset => "Expert Subset",
+            Charset::Custom(_) => "Custom",
+        }
+    );
+    println!(
+        " - variant: {}",
+        match font.data {
+            CFFVariant::CID(_) => "CID",
+            CFFVariant::Type1(_) => "Type 1",
+        }
+    );
     println!();
     println!(" - Top DICT");
-    for (op, operands) in top_dict.iter() {
+    for (op, operands) in font.top_dict.iter() {
         println!("  - {:?}: {:?}", op, operands);
     }
     println!();
     println!(" - Private DICT");
-    let private_dict = cff.private_dict(0)?;
+    let private_dict = font.private_dict()?;
     for (op, operands) in private_dict.iter() {
         println!("  - {:?}: {:?}", op, operands);
     }
