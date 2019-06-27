@@ -13,7 +13,7 @@ use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
-use fontcode::cff::{self, CFFVariant, Charset, Op1, Operand, Operator, CFF};
+use fontcode::cff::{self, CFFVariant, Charset, Op1, Operator, CFF};
 use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::env;
@@ -345,13 +345,13 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
         return Err(ParseError::BadIndex);
     }
     let font = cff.font(0).ok_or(ParseError::MissingValue)?;
-    let char_strings_operands = font.top_dict.get(Operator::Op1(Op1::CharStrings))?;
-    let char_strings_index = match char_strings_operands {
-        [Operand::Integer(offset)] => scope
-            .offset(usize::try_from(*offset)?)
-            .read::<cff::Index<'_>>(),
-        _ => Err(ParseError::BadValue),
-    }?;
+    let offset = font
+        .top_dict
+        .get_i32(Operator::Op1(Op1::CharStrings))
+        .ok_or(ParseError::MissingValue)??;
+    let char_strings_index = scope
+        .offset(usize::try_from(offset)?)
+        .read::<cff::Index<'_>>()?;
     println!(" - num glyphs: {}", char_strings_index.count);
     println!(
         " - charset: {}",
@@ -367,6 +367,13 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
         match font.data {
             CFFVariant::CID(_) => "CID",
             CFFVariant::Type1(_) => "Type 1",
+        }
+    );
+    println!(
+        " - subrs: {}",
+        match font.local_subr_index {
+            Some(ref index) => index.count,
+            None => 0,
         }
     );
     println!();
