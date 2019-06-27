@@ -379,6 +379,12 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     for (op, operands) in top_dict.iter() {
         println!("  - {:?}: {:?}", op, operands);
     }
+    println!();
+    println!(" - Private DICT");
+    let private_dict = cff.private_dict(0)?;
+    for (op, operands) in private_dict.iter() {
+        println!("  - {:?}: {:?}", op, operands);
+    }
 
     Ok(())
 }
