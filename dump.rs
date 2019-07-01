@@ -82,10 +82,10 @@ fn main() -> Result<(), Error> {
     } else {
         match ReadScope::new(&buffer).read::<FontFile>()? {
             FontFile::OpenType(font_file) => match font_file.font {
-                OpenTypeFont::Single(ttf) => dump_ttf(font_file.scope, ttf, table)?,
+                OpenTypeFont::Single(ttf) => dump_ttf(&font_file.scope, ttf, table)?,
                 OpenTypeFont::Collection(ttc) => dump_ttc(font_file.scope, ttc, table)?,
             },
-            FontFile::Woff(woff_file) => dump_woff(woff_file.scope, woff_file, table)?,
+            FontFile::Woff(woff_file) => dump_woff(woff_file, table)?,
             FontFile::Woff2(woff_file) => {
                 dump_woff2(woff_file.table_data_block_scope(), &woff_file, table, index)?
             }
@@ -115,15 +115,19 @@ fn dump_ttc<'a>(scope: ReadScope<'a>, ttc: TTCHeader<'a>, tag: Option<Tag>) -> R
     for offset_table_offset in &ttc.offset_tables {
         let offset_table_offset = usize::try_from(offset_table_offset).map_err(ParseError::from)?;
         let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
-        dump_ttf(scope, offset_table, tag)?;
+        dump_ttf(&scope, offset_table, tag)?;
     }
     println!();
     Ok(())
 }
 
-fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>, tag: Option<Tag>) -> Result<(), Error> {
+fn dump_ttf<'a>(
+    scope: &ReadScope<'a>,
+    ttf: OffsetTable<'a>,
+    tag: Option<Tag>,
+) -> Result<(), Error> {
     if let Some(tag) = tag {
-        return dump_raw_table(ttf.read_table(scope, tag)?);
+        return dump_raw_table(ttf.read_table(&scope, tag)?);
     }
 
     println!("TTF");
@@ -138,26 +142,27 @@ fn dump_ttf<'a>(scope: ReadScope<'a>, ttf: OffsetTable<'a>, tag: Option<Tag>) ->
             table_record.offset,
             table_record.length
         );
-        let _table = table_record.read_table(scope)?;
+        let _table = table_record.read_table(&scope)?;
     }
-    if let Some(cff_table_data) = ttf.read_table(scope, tag::CFF)? {
+    if let Some(cff_table_data) = ttf.read_table(&scope, tag::CFF)? {
         println!();
         dump_cff_table(cff_table_data)?;
     }
     println!();
-    if let Some(name_table_data) = ttf.read_table(scope, tag::NAME)? {
+    if let Some(name_table_data) = ttf.read_table(&scope, tag::NAME)? {
         let name_table = name_table_data.read::<NameTable>()?;
         dump_name_table(&name_table)?;
     }
     Ok(())
 }
 
-fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>, tag: Option<Tag>) -> Result<(), Error> {
+fn dump_woff<'a>(woff: WoffFile<'a>, tag: Option<Tag>) -> Result<(), Error> {
+    let scope = &woff.scope;
     if let Some(tag) = tag {
         if let Some(entry) = woff.table_directory.iter().find(|entry| entry.tag == tag) {
-            let table = entry.read_table(woff.scope)?;
+            let table = entry.read_table(&woff.scope)?;
 
-            return dump_raw_table(Some(table.scope()));
+            return dump_raw_table(Some(table.scope().clone()));
         } else {
             eprintln!("Table {} not found", DisplayTag(tag));
         }
@@ -176,7 +181,7 @@ fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>, tag: Option<Tag>) -> 
             entry.comp_length,
             entry.orig_length
         );
-        let _table = entry.read_table(scope)?;
+        let _table = entry.read_table(&scope)?;
     }
 
     let metadata = woff.extended_metadata()?;
@@ -190,7 +195,7 @@ fn dump_woff<'a>(scope: ReadScope<'a>, woff: WoffFile<'a>, tag: Option<Tag>) -> 
         .iter()
         .find(|entry| entry.tag == tag::NAME)
     {
-        let table = entry.read_table(woff.scope)?;
+        let table = entry.read_table(&woff.scope)?;
         let name_table = table.scope().read::<NameTable>()?;
         dump_name_table(&name_table)?;
     }
@@ -206,7 +211,7 @@ fn dump_woff2<'a>(
 ) -> Result<(), Error> {
     if let Some(tag) = tag {
         let table = woff.read_table(tag, index)?;
-        return dump_raw_table(table.as_ref().map(|buf| buf.scope()));
+        return dump_raw_table(table.as_ref().map(|buf| buf.scope().clone()));
     }
 
     println!("TTF in WOFF2");
@@ -231,7 +236,7 @@ fn dump_woff2<'a>(
 
     if let Some(entry) = woff.find_table_entry(tag::GLYF, index) {
         println!();
-        let table = entry.read_table(scope)?;
+        let table = entry.read_table(&scope)?;
         let head = woff
             .read_table(tag::HEAD, index)?
             .ok_or(ParseError::BadValue)?
@@ -245,13 +250,13 @@ fn dump_woff2<'a>(
         let loca_entry = woff
             .find_table_entry(tag::LOCA, index)
             .ok_or(ParseError::BadValue)?;
-        let loca = loca_entry.read_table(woff.table_data_block_scope())?;
+        let loca = loca_entry.read_table(&woff.table_data_block_scope())?;
         let loca = loca.scope().read_dep::<Woff2LocaTable>((
             &loca_entry,
             usize::from(maxp.num_glyphs),
             head.index_to_loc_format,
         ))?;
-        let glyf = table.scope().read_dep::<Woff2GlyfTable>((&entry, loca))?;
+        let glyf = table.scope().read_dep::<Woff2GlyfTable>((&entry, &loca))?;
 
         println!("Read glyf table with {} glyphs:", glyf.records.len());
         for glyph in glyf.records {
@@ -397,7 +402,7 @@ fn dump_glyph(buffer: &[u8], index: usize, glyph_id: u16) -> Result<(), ParseErr
 
     let table = provider.get_table(tag::GLYF).expect("no glyf table");
     let scope = ReadScope::new(table.borrow());
-    let glyf = scope.read_dep::<GlyfTable>(loca)?;
+    let glyf = scope.read_dep::<GlyfTable>(&loca)?;
 
     let glyph = glyf
         .records

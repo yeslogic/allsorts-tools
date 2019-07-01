@@ -29,8 +29,8 @@ fn main() -> Result<(), ShapingError> {
     let fontfile = ReadScope::new(&buffer).read::<OpenTypeFile>()?;
 
     match fontfile.font {
-        OpenTypeFont::Single(ttf) => shape_ttf(fontfile.scope, ttf, script, lang, text)?,
-        OpenTypeFont::Collection(ttc) => shape_ttc(fontfile.scope, ttc, script, lang, text)?,
+        OpenTypeFont::Single(ttf) => shape_ttf(&fontfile.scope, ttf, script, lang, text)?,
+        OpenTypeFont::Collection(ttc) => shape_ttc(&fontfile.scope, ttc, script, lang, text)?,
     }
 
     Ok(())
@@ -44,7 +44,7 @@ fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
 }
 
 fn shape_ttc<'a>(
-    scope: ReadScope<'a>,
+    scope: &ReadScope<'a>,
     ttc: TTCHeader<'a>,
     script: u32,
     lang: u32,
@@ -59,13 +59,13 @@ fn shape_ttc<'a>(
 }
 
 fn shape_ttf<'a>(
-    scope: ReadScope<'a>,
+    scope: &ReadScope<'a>,
     ttf: OffsetTable<'a>,
     script: u32,
     lang: u32,
     text: &str,
 ) -> Result<(), ShapingError> {
-    let cmap = if let Some(cmap_scope) = ttf.read_table(scope, tag::CMAP)? {
+    let cmap = if let Some(cmap_scope) = ttf.read_table(&scope, tag::CMAP)? {
         cmap_scope.read::<Cmap>()?
     } else {
         println!("no cmap table");
@@ -85,13 +85,19 @@ fn shape_ttf<'a>(
     let mut glyphs = opt_glyphs.into_iter().flatten().collect();
     println!("glyphs before: {:?}", glyphs);
     if let Some(gsub_record) = ttf.find_table_record(tag::GSUB) {
-        let gsub_table = gsub_record.read_table(scope)?.read::<LayoutTable<GSUB>>()?;
+        let gsub_table = gsub_record
+            .read_table(&scope)?
+            .read::<LayoutTable<GSUB>>()?;
         let opt_gdef_table = match ttf.find_table_record(tag::GDEF) {
-            Some(gdef_record) => Some(gdef_record.read_table(scope)?.read::<GDEFTable>()?),
+            Some(gdef_record) => Some(gdef_record.read_table(&scope)?.read::<GDEFTable>()?),
             None => None,
         };
         let opt_gpos_table = match ttf.find_table_record(tag::GPOS) {
-            Some(gpos_record) => Some(gpos_record.read_table(scope)?.read::<LayoutTable<GPOS>>()?),
+            Some(gpos_record) => Some(
+                gpos_record
+                    .read_table(&scope)?
+                    .read::<LayoutTable<GPOS>>()?,
+            ),
             None => None,
         };
         let vertical = false;
