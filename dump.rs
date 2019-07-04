@@ -344,13 +344,13 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     if cff.name_index.count != 1 {
         return Err(ParseError::BadIndex);
     }
-    let font = cff.font(0).ok_or(ParseError::MissingValue)?;
-    let offset = font
+    let font = cff.fonts.get(0).ok_or(ParseError::MissingValue)?;
+    let char_strings_offset = font
         .top_dict
         .get_i32(Operator::Op1(Op1::CharStrings))
         .ok_or(ParseError::MissingValue)??;
     let char_strings_index = scope
-        .offset(usize::try_from(offset)?)
+        .offset(usize::try_from(char_strings_offset)?)
         .read::<cff::Index<'_>>()?;
     println!(" - num glyphs: {}", char_strings_index.count);
     println!(
