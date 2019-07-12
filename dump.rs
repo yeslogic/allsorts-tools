@@ -13,7 +13,7 @@ use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
-use fontcode::cff::{self, CFFVariant, Charset, FontDict, Op1, Operator, CFF};
+use fontcode::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
 use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::env;
@@ -347,7 +347,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     let font = cff.fonts.get(0).ok_or(ParseError::MissingValue)?;
     let char_strings_offset = font
         .top_dict
-        .get_i32(Operator::Op1(Op1::CharStrings))
+        .get_i32(Operator::CharStrings)
         .ok_or(ParseError::MissingValue)??;
     let char_strings_index = scope
         .offset(usize::try_from(char_strings_offset)?)
