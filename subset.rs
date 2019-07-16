@@ -25,7 +25,25 @@ enum Error {
     Message(&'static str),
 }
 
-fn main() -> Result<(), Error> {
+fn main() {
+    match run() {
+        Ok(()) => {}
+        Err(err) => {
+            eprint!("Unable to subset due to error: ");
+            match err {
+                Error::Io(io) => eprintln!("I/O error: {}", io),
+                Error::Parse(err) => eprintln!("Parse error: {:?}", err),
+                Error::ReadWrite(rw_err) => match rw_err {
+                    ReadWriteError::Read(err) => eprintln!("Parse error: {:?}", err),
+                    ReadWriteError::Write(err) => eprintln!("Write error: {:?}", err),
+                },
+                Error::Message(msg) => eprintln!("{}", msg),
+            }
+        }
+    }
+}
+
+fn run() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
 
