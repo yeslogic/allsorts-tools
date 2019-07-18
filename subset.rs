@@ -119,12 +119,13 @@ fn subset<'a, F: FontTableProvider>(
     };
     glyphs.insert(0, Some(notdef));
 
-    let mut glyph_ids = glyphs
+    let mut glyphs: Vec<RawGlyph<()>> = glyphs.into_iter().flatten().collect();
+    glyphs.sort_by(|a, b| a.glyph_index.cmp(&b.glyph_index));
+    let glyph_ids = glyphs
         .iter()
-        .flat_map(|glyph| glyph.as_ref().and_then(|raw_glyph| raw_glyph.glyph_index))
-        .collect::<Vec<_>>();
-    glyph_ids.sort();
-    let glyph_ids = glyph_ids.into_iter().dedup().collect::<Vec<_>>();
+        .flat_map(|glyph| glyph.glyph_index)
+        .dedup()
+        .collect_vec();
     if glyph_ids.is_empty() {
         return Err(Error::Message("no glyphs left in font"));
     }
@@ -138,15 +139,15 @@ fn subset<'a, F: FontTableProvider>(
             .iter()
             .skip(1)
             .enumerate()
-            .for_each(|(glyph_index, glyph)| match glyph {
-                Some(RawGlyph {
+            .for_each(|(glyph_index, glyph)| {
+                if let RawGlyph {
                     glyph_origin: GlyphOrigin::Char(chr),
                     ..
-                }) => {
+                } = glyph
+                {
                     cmap0[usize::from(macroman::char_to_macroman(*chr).unwrap())] =
-                        glyph_index as u8 + 1
+                        glyph_index as u8 + 1;
                 }
-                _ => unreachable!(),
             });
         Some(Box::new(cmap0))
     } else {
@@ -210,12 +211,12 @@ fn make_glyph(ch: char, glyph_index: u16) -> RawGlyph<()> {
     }
 }
 
-fn is_macroman(glyph: &Option<RawGlyph<()>>) -> bool {
+fn is_macroman(glyph: &RawGlyph<()>) -> bool {
     match glyph {
-        Some(RawGlyph {
+        RawGlyph {
             glyph_origin: GlyphOrigin::Char(chr),
             ..
-        }) => macroman::is_macroman(*chr),
+        } => macroman::is_macroman(*chr),
         _ => false,
     }
 }

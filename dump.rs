@@ -2,6 +2,7 @@ use atty::Stream;
 use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use getopts::Options;
 
+use fontcode::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
 use fontcode::error::ParseError;
 use fontcode::font_tables;
 use fontcode::fontfile::FontFile;
@@ -13,7 +14,6 @@ use fontcode::tag::{self, DisplayTag};
 use fontcode::woff::WoffFile;
 use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
-use fontcode::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
 use std::borrow::Borrow;
 use std::convert::TryFrom;
 use std::env;
@@ -376,6 +376,15 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     }
     match &font.data {
         CFFVariant::Type1(ref type1) => {
+            println!();
+            println!(
+                " - encoding: {}",
+                match type1.encoding {
+                    cff::Encoding::Standard => "Standard",
+                    cff::Encoding::Expert => "Expert",
+                    cff::Encoding::Custom(_) => "Custom",
+                }
+            );
             println!();
             println!(" - Private DICT");
             for (op, operands) in type1.private_dict.iter() {
