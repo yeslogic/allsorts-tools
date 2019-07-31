@@ -101,7 +101,7 @@ fn shape_ttf<'a>(
             None => None,
         };
         let vertical = false;
-        let res = gsub_apply_default(
+        gsub_apply_default(
             &|| make_dotted_circle(&cmap_subtable),
             &gsub_table,
             opt_gdef_table.as_ref(),
@@ -110,10 +110,7 @@ fn shape_ttf<'a>(
             vertical,
             &mut glyphs,
         )?;
-        println!("res: {}", res);
-        if res {
-            println!("glyphs after: {:?}", glyphs);
-        }
+        println!("glyphs after: {:?}", glyphs);
         match opt_gpos_table {
             Some(gpos_table) => {
                 let kerning = true;
