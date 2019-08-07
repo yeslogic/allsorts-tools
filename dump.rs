@@ -35,6 +35,7 @@ fn main() -> Result<(), Error> {
     let program = args[0].clone();
 
     let mut opts = Options::new();
+    opts.optflag("c", "cff", "treat the file as a CFF font/table");
     opts.optopt("t", "table", "dump the content of this table", "TABLE");
     opts.optopt("i", "index", "index of the font to dump (for TTC)", "INDEX");
     opts.optopt("g", "glyph", "dump the specified glyph", "INDEX");
@@ -79,6 +80,8 @@ fn main() -> Result<(), Error> {
         dump_loca_table(&buffer, index)?;
     } else if let Ok(Some(glyph_id)) = matches.opt_get::<u16>("g") {
         dump_glyph(&buffer, index, glyph_id)?;
+    } else if matches.opt_present("c") {
+        dump_cff_table(ReadScope::new(&buffer))?
     } else {
         match ReadScope::new(&buffer).read::<FontFile>()? {
             FontFile::OpenType(font_file) => match font_file.font {
