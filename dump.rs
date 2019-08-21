@@ -393,25 +393,52 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
             for (op, operands) in type1.private_dict.iter() {
                 println!("  - {:?}: {:?}", op, operands);
             }
-            println!(
-                " - subrs: {}",
-                match type1.local_subr_index {
-                    Some(ref index) => index.count,
-                    None => 0,
-                }
-            );
+            let (subrs_count, subrs_size) = match type1.local_subr_index {
+                Some(ref index) => (index.count, index.data_len()),
+                None => (0, 0),
+            };
+            println!(" - Local subrs: {} ({} bytes)", subrs_count, subrs_size);
         }
         CFFVariant::CID(cid) => {
-            println!();
             for (i, object) in cid.font_dict_index.iter().enumerate() {
+                println!();
                 println!(" - Font DICT {}", i);
                 let font_dict = ReadScope::new(object).read::<FontDict>()?;
                 for (op, operands) in font_dict.iter() {
                     println!("  - {:?}: {:?}", op, operands);
                 }
+
+                println!();
+                println!("  - Private DICT");
+                let (private_dict, private_dict_offset) = font_dict.read_private_dict(&scope)?;
+                for (op, operands) in private_dict.iter() {
+                    println!("   - {:?}: {:?}", op, operands);
+                }
             }
+            let (subrs_count, subrs_size) =
+                cid.local_subr_indices
+                    .iter()
+                    .fold((0, 0), |(mut count, mut size), index| {
+                        if let Some(index) = index {
+                            count += index.count;
+                            size += index.data_len();
+                        }
+                        (count, size)
+                    });
+            println!();
+            println!(
+                " - Local subrs: {} ({} bytes) in {} indices",
+                subrs_count,
+                subrs_size,
+                cid.local_subr_indices.len()
+            );
         }
     }
+    println!(
+        " - Global subrs: {} ({} bytes)",
+        cff.global_subr_index.count,
+        cff.global_subr_index.data_len()
+    );
 
     Ok(())
 }
