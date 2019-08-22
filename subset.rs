@@ -11,7 +11,6 @@ use fontcode::tag;
 use fontcode::{macroman, subset};
 use itertools::Itertools;
 
-use std::borrow::Cow;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -167,7 +166,7 @@ fn chars_to_glyphs<'a, F: FontTableProvider>(
     font_provider: &F,
     text: &str,
 ) -> Result<Vec<Option<RawGlyph<()>>>, Error> {
-    let cmap_data = read_table_data(font_provider, tag::CMAP)?;
+    let cmap_data = font_provider.read_table_data(tag::CMAP)?;
     let cmap = ReadScope::new(&cmap_data).read::<Cmap>()?;
     let cmap_subtable =
         read_cmap_subtable(&cmap)?.ok_or(Error::Message("no suitable cmap sub-table found"))?;
@@ -178,13 +177,6 @@ fn chars_to_glyphs<'a, F: FontTableProvider>(
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(glyphs)
-}
-
-fn read_table_data<'a, F: FontTableProvider>(
-    provider: &'a F,
-    tag: u32,
-) -> Result<Cow<'a, [u8]>, ParseError> {
-    provider.table_data(tag)?.ok_or(ParseError::MissingValue)
 }
 
 fn map_glyph(cmap_subtable: &CmapSubtable, ch: char) -> Result<Option<RawGlyph<()>>, ParseError> {
