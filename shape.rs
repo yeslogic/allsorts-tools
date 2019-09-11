@@ -24,7 +24,7 @@ fn main() -> Result<(), ShapingError> {
     let script = tag::from_string(&args[2])?;
     let lang = tag::from_string(&args[3])?;
     let text = &args[4];
-    let buffer = read_file(filename)?;
+    let buffer = read_file(filename).expect(&format!("unable to read {}", filename));
 
     let fontfile = ReadScope::new(&buffer).read::<OpenTypeFile>()?;
 
