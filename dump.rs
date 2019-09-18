@@ -2,17 +2,17 @@ use atty::Stream;
 use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use getopts::Options;
 
-use fontcode::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
-use fontcode::error::ParseError;
+use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
+use allsorts::error::ParseError;
+use allsorts::fontfile::FontFile;
+use allsorts::read::ReadScope;
+use allsorts::tables::glyf::GlyfTable;
+use allsorts::tables::loca::LocaTable;
+use allsorts::tables::{HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader};
+use allsorts::tag::{self, DisplayTag};
+use allsorts::woff::WoffFile;
+use allsorts::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 use fontcode::font_tables;
-use fontcode::fontfile::FontFile;
-use fontcode::read::ReadScope;
-use fontcode::tables::glyf::GlyfTable;
-use fontcode::tables::loca::LocaTable;
-use fontcode::tables::{HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader};
-use fontcode::tag::{self, DisplayTag};
-use fontcode::woff::WoffFile;
-use fontcode::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
 use std::borrow::Borrow;
 use std::convert::TryFrom;
