@@ -1,4 +1,5 @@
 use allsorts::error::{ParseError, ShapingError};
+use allsorts::font_data_impl::read_cmap_subtable;
 use allsorts::gpos::{gpos_apply, Info};
 use allsorts::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
 use allsorts::layout::{new_layout_cache, GDEFTable, LayoutTable, GPOS, GSUB};
@@ -6,7 +7,6 @@ use allsorts::read::ReadScope;
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use allsorts::tag;
-use fontcode::font_data_impl::read_cmap_subtable;
 use std::convert::TryFrom;
 use std::env;
 use std::fs::File;

@@ -1,13 +1,13 @@
 use getopts::Options;
 
 use allsorts::error::{ParseError, ReadWriteError};
+use allsorts::font_data_impl::read_cmap_subtable;
 use allsorts::gsub::{GlyphOrigin, RawGlyph};
 use allsorts::read::ReadScope;
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::FontTableProvider;
 use allsorts::tag;
 use allsorts::{macroman, subset};
-use fontcode::font_data_impl::read_cmap_subtable;
 use fontcode::font_tables::{FontImpl, FontTablesImpl};
 use itertools::Itertools;
 
