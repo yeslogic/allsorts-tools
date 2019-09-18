@@ -2,10 +2,10 @@ use atty::Stream;
 use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use getopts::Options;
 
+use allsorts::binary::read::ReadScope;
 use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
 use allsorts::error::ParseError;
 use allsorts::fontfile::FontFile;
-use allsorts::read::ReadScope;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::{HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader};
