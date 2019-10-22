@@ -12,7 +12,16 @@ use std::env;
 use std::fs::File;
 use std::io::{self, Read};
 
-fn main() -> Result<(), ShapingError> {
+pub fn main() {
+    match run() {
+        Ok(()) => {}
+        Err(err) => {
+            eprint!("Shaping error: {}", err);
+        }
+    }
+}
+
+pub fn run() -> Result<(), ShapingError> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 5 {

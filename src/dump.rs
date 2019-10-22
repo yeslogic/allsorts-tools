@@ -8,11 +8,12 @@ use allsorts::error::ParseError;
 use allsorts::fontfile::FontFile;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
-use allsorts::tables::{HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader};
+use allsorts::tables::{
+    FontTableProvider, HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader,
+};
 use allsorts::tag::{self, DisplayTag};
 use allsorts::woff::WoffFile;
 use allsorts::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
-use fontcode::font_tables;
 
 use std::borrow::Borrow;
 use std::convert::TryFrom;
@@ -21,16 +22,20 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::str::{self, FromStr};
 
+use crate::{BoxError, ErrorMessage};
+
 type Tag = u32;
 
-#[derive(Debug)]
-enum Error {
-    Io(io::Error),
-    Parse(ParseError),
-    Message(&'static str),
+pub fn main() {
+    match run() {
+        Ok(()) => {}
+        Err(err) => {
+            eprint!("Unable to dump due to error: {}", err);
+        }
+    }
 }
 
-fn main() -> Result<(), Error> {
+pub fn run() -> Result<(), BoxError> {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
 
@@ -57,7 +62,7 @@ fn main() -> Result<(), Error> {
         .map(|table| tag::from_string(&table))
         .transpose()?;
     if table.is_some() && atty::is(Stream::Stdout) {
-        return Err(Error::Message("Not printing binary data to tty."));
+        return Err(ErrorMessage("Not printing binary data to tty.").into());
     }
 
     let index = matches
@@ -75,18 +80,21 @@ fn main() -> Result<(), Error> {
     };
 
     let buffer = read_file(filename)?;
+    let scope = ReadScope::new(&buffer);
+    let font_file = scope.read::<FontFile>()?;
+    let table_provider = font_file.table_provider(index)?;
 
     if matches.opt_present("l") {
-        dump_loca_table(&buffer, index)?;
+        dump_loca_table(&table_provider)?;
     } else if let Ok(Some(glyph_id)) = matches.opt_get::<u16>("g") {
-        dump_glyph(&buffer, index, glyph_id)?;
+        dump_glyph(&table_provider, glyph_id)?;
     } else if matches.opt_present("c") {
         dump_cff_table(ReadScope::new(&buffer))?
     } else {
-        match ReadScope::new(&buffer).read::<FontFile>()? {
-            FontFile::OpenType(font_file) => match font_file.font {
+        match &font_file {
+            FontFile::OpenType(font_file) => match &font_file.font {
                 OpenTypeFont::Single(ttf) => dump_ttf(&font_file.scope, ttf, table)?,
-                OpenTypeFont::Collection(ttc) => dump_ttc(font_file.scope, ttc, table)?,
+                OpenTypeFont::Collection(ttc) => dump_ttc(&font_file.scope, ttc, table)?,
             },
             FontFile::Woff(woff_file) => dump_woff(woff_file, table)?,
             FontFile::Woff2(woff_file) => {
@@ -110,7 +118,11 @@ fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
     Ok(buffer)
 }
 
-fn dump_ttc<'a>(scope: ReadScope<'a>, ttc: TTCHeader<'a>, tag: Option<Tag>) -> Result<(), Error> {
+fn dump_ttc<'a>(
+    scope: &ReadScope<'a>,
+    ttc: &TTCHeader<'a>,
+    tag: Option<Tag>,
+) -> Result<(), BoxError> {
     println!("TTC");
     println!(" - version: {}.{}", ttc.major_version, ttc.minor_version);
     println!(" - num_fonts: {}", ttc.offset_tables.len());
@@ -118,7 +130,7 @@ fn dump_ttc<'a>(scope: ReadScope<'a>, ttc: TTCHeader<'a>, tag: Option<Tag>) -> R
     for offset_table_offset in &ttc.offset_tables {
         let offset_table_offset = usize::try_from(offset_table_offset).map_err(ParseError::from)?;
         let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
-        dump_ttf(&scope, offset_table, tag)?;
+        dump_ttf(&scope, &offset_table, tag)?;
     }
     println!();
     Ok(())
@@ -126,9 +138,9 @@ fn dump_ttc<'a>(scope: ReadScope<'a>, ttc: TTCHeader<'a>, tag: Option<Tag>) -> R
 
 fn dump_ttf<'a>(
     scope: &ReadScope<'a>,
-    ttf: OffsetTable<'a>,
+    ttf: &OffsetTable<'a>,
     tag: Option<Tag>,
-) -> Result<(), Error> {
+) -> Result<(), BoxError> {
     if let Some(tag) = tag {
         return dump_raw_table(ttf.read_table(&scope, tag)?);
     }
@@ -159,7 +171,7 @@ fn dump_ttf<'a>(
     Ok(())
 }
 
-fn dump_woff<'a>(woff: WoffFile<'a>, tag: Option<Tag>) -> Result<(), Error> {
+fn dump_woff<'a>(woff: &WoffFile<'a>, tag: Option<Tag>) -> Result<(), BoxError> {
     let scope = &woff.scope;
     if let Some(tag) = tag {
         if let Some(entry) = woff.table_directory.iter().find(|entry| entry.tag == tag) {
@@ -211,7 +223,7 @@ fn dump_woff2<'a>(
     woff: &Woff2File<'a>,
     tag: Option<Tag>,
     index: usize,
-) -> Result<(), Error> {
+) -> Result<(), BoxError> {
     if let Some(tag) = tag {
         let table = woff.read_table(tag, index)?;
         return dump_raw_table(table.as_ref().map(|buf| buf.scope().clone()));
@@ -309,19 +321,16 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
     Ok(())
 }
 
-fn dump_loca_table(buffer: &[u8], index: usize) -> Result<(), ParseError> {
-    let font = font_tables::FontImpl::new(&buffer, index).unwrap();
-    let provider = font_tables::FontTablesImpl::FontImpl(font);
-
-    let table = provider.get_table(tag::HEAD).expect("no head table");
+fn dump_loca_table(provider: &impl FontTableProvider) -> Result<(), ParseError> {
+    let table = provider.table_data(tag::HEAD)?.expect("no head table");
     let scope = ReadScope::new(table.borrow());
     let head = scope.read::<HeadTable>()?;
 
-    let table = provider.get_table(tag::MAXP).expect("no maxp table");
+    let table = provider.table_data(tag::MAXP)?.expect("no maxp table");
     let scope = ReadScope::new(table.borrow());
     let maxp = scope.read::<MaxpTable>()?;
 
-    let table = provider.get_table(tag::LOCA).expect("no loca table");
+    let table = provider.table_data(tag::LOCA)?.expect("no loca table");
     let scope = ReadScope::new(table.borrow());
     let loca =
         scope.read_dep::<LocaTable>((usize::from(maxp.num_glyphs), head.index_to_loc_format))?;
@@ -443,24 +452,21 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     Ok(())
 }
 
-fn dump_glyph(buffer: &[u8], index: usize, glyph_id: u16) -> Result<(), ParseError> {
-    let font = font_tables::FontImpl::new(&buffer, index).unwrap();
-    let provider = font_tables::FontTablesImpl::FontImpl(font);
-
-    let table = provider.get_table(tag::HEAD).expect("no head table");
+fn dump_glyph(provider: &impl FontTableProvider, glyph_id: u16) -> Result<(), ParseError> {
+    let table = provider.table_data(tag::HEAD)?.expect("no head table");
     let scope = ReadScope::new(table.borrow());
     let head = scope.read::<HeadTable>()?;
 
-    let table = provider.get_table(tag::MAXP).expect("no maxp table");
+    let table = provider.table_data(tag::MAXP)?.expect("no maxp table");
     let scope = ReadScope::new(table.borrow());
     let maxp = scope.read::<MaxpTable>()?;
 
-    let table = provider.get_table(tag::LOCA).expect("no loca table");
+    let table = provider.table_data(tag::LOCA)?.expect("no loca table");
     let scope = ReadScope::new(table.borrow());
     let loca =
         scope.read_dep::<LocaTable>((usize::from(maxp.num_glyphs), head.index_to_loc_format))?;
 
-    let table = provider.get_table(tag::GLYF).expect("no glyf table");
+    let table = provider.table_data(tag::GLYF)?.expect("no glyf table");
     let scope = ReadScope::new(table.borrow());
     let glyf = scope.read_dep::<GlyfTable>(&loca)?;
 
@@ -473,11 +479,13 @@ fn dump_glyph(buffer: &[u8], index: usize, glyph_id: u16) -> Result<(), ParseErr
     Ok(())
 }
 
-fn dump_raw_table(scope: Option<ReadScope>) -> Result<(), Error> {
+fn dump_raw_table(scope: Option<ReadScope>) -> Result<(), BoxError> {
     if let Some(scope) = scope {
-        io::stdout().write_all(scope.data()).map_err(Error::from)
+        io::stdout()
+            .write_all(scope.data())
+            .map_err(|err| err.into())
     } else {
-        Err(Error::Message("Table not found"))
+        Err(ErrorMessage("Table not found").into())
     }
 }
 
@@ -521,17 +529,5 @@ fn get_name_meaning(name_id: u16) -> Option<&'static str> {
         24 => Some("Dark Background Palette"),
         25 => Some("Variations PostScript Name Prefix"),
         _ => None,
-    }
-}
-
-impl From<ParseError> for Error {
-    fn from(err: ParseError) -> Self {
-        Error::Parse(err)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Error::Io(err)
     }
 }

@@ -1,30 +1,30 @@
 use getopts::Options;
+use itertools::Itertools;
 
 use allsorts::binary::read::ReadScope;
 use allsorts::error::{ParseError, ReadWriteError};
 use allsorts::font_data_impl::read_cmap_subtable;
+use allsorts::fontfile::FontFile;
 use allsorts::gsub::{GlyphOrigin, RawGlyph};
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::FontTableProvider;
-use allsorts::tag;
-use allsorts::{macroman, subset};
-use fontcode::font_tables::{FontImpl, FontTablesImpl};
-use itertools::Itertools;
+use allsorts::{macroman, subset, tag};
 
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::str;
+use std::str::FromStr;
 
 #[derive(Debug)]
-enum Error {
+pub enum Error {
     Io(io::Error),
     Parse(ParseError),
     ReadWrite(ReadWriteError),
     Message(&'static str),
 }
 
-fn main() {
+pub fn main() {
     match run() {
         Ok(()) => {}
         Err(err) => {
@@ -54,6 +54,7 @@ fn run() -> Result<(), Error> {
         "TEXT",
     );
     opts.optflag("h", "help", "print this help menu");
+    opts.optopt("i", "index", "index of the font to dump (for TTC)", "INDEX");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -69,6 +70,13 @@ fn run() -> Result<(), Error> {
         .opt_str("t")
         .ok_or(Error::Message("-t TEXT is required"))?;
 
+    let index = matches
+        .opt_str("i")
+        .map(|index| usize::from_str(&index))
+        .transpose()
+        .map_err(|_err| ParseError::BadValue)?
+        .unwrap_or_default();
+
     if matches.free.len() < 2 {
         print_usage(&program, opts);
         return Ok(());
@@ -77,9 +85,9 @@ fn run() -> Result<(), Error> {
     let input = matches.free[0].as_str();
     let output = matches.free[1].as_str();
     let buffer = read_file(input)?;
+    let font_file = ReadScope::new(&buffer).read::<FontFile>()?;
+    let provider = font_file.table_provider(index)?;
 
-    let font = FontImpl::new(&buffer, 0).unwrap();
-    let provider = FontTablesImpl::FontImpl(font);
     subset(&provider, &text, output)?;
 
     Ok(())
