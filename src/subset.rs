@@ -1,34 +1,26 @@
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::Write;
 use std::str;
 
 use itertools::Itertools;
 
 use allsorts::binary::read::ReadScope;
-use allsorts::error::ParseError;
 use allsorts::font_data_impl::read_cmap_subtable;
 use allsorts::fontfile::FontFile;
 use allsorts::gsub::{GlyphOrigin, RawGlyph};
-use allsorts::tables::cmap::{Cmap, CmapSubtable};
+use allsorts::tables::cmap::Cmap;
 use allsorts::tables::FontTableProvider;
 use allsorts::{macroman, subset, tag};
 
 use crate::cli::SubsetOpts;
-use crate::{BoxError, ErrorMessage};
+use crate::{glyph, BoxError, ErrorMessage};
 
 pub fn main(opts: SubsetOpts) -> Result<(), BoxError> {
-    let buffer = read_file(&opts.input)?;
+    let buffer = crate::read_file(&opts.input)?;
     let font_file = ReadScope::new(&buffer).read::<FontFile>()?;
     let provider = font_file.table_provider(opts.index)?;
 
     subset(&provider, &opts.text, &opts.output)
-}
-
-fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
-    let mut file = File::open(path)?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-    Ok(buffer)
 }
 
 fn subset<'a, F: FontTableProvider>(
@@ -107,34 +99,10 @@ fn chars_to_glyphs<'a, F: FontTableProvider>(
 
     let glyphs = text
         .chars()
-        .map(|ch| map_glyph(&cmap_subtable, ch))
+        .map(|ch| glyph::map(&cmap_subtable, ch))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(glyphs)
-}
-
-fn map_glyph(cmap_subtable: &CmapSubtable, ch: char) -> Result<Option<RawGlyph<()>>, ParseError> {
-    if let Some(glyph_index) = cmap_subtable.map_glyph(ch as u32)? {
-        let glyph = make_glyph(ch, glyph_index);
-        Ok(Some(glyph))
-    } else {
-        Ok(None)
-    }
-}
-
-fn make_glyph(ch: char, glyph_index: u16) -> RawGlyph<()> {
-    RawGlyph {
-        unicodes: vec![ch],
-        glyph_index: Some(glyph_index),
-        liga_component_pos: 0,
-        glyph_origin: GlyphOrigin::Char(ch),
-        small_caps: false,
-        multi_subst_dup: false,
-        is_vert_alt: false,
-        fake_bold: false,
-        fake_italic: false,
-        extra_data: (),
-    }
 }
 
 fn is_macroman(glyph: &RawGlyph<()>) -> bool {

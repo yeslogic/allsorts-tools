@@ -16,8 +16,7 @@ use allsorts::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
 use std::borrow::Borrow;
 use std::convert::TryFrom;
-use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::str;
 
 use crate::cli::DumpOpts;
@@ -34,7 +33,7 @@ pub fn main(opts: DumpOpts) -> Result<(), BoxError> {
         return Err(ErrorMessage("Not printing binary data to tty.").into());
     }
 
-    let buffer = read_file(&opts.font)?;
+    let buffer = crate::read_file(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontFile>()?;
     let table_provider = font_file.table_provider(opts.index)?;
@@ -62,13 +61,6 @@ pub fn main(opts: DumpOpts) -> Result<(), BoxError> {
     }
 
     Ok(())
-}
-
-fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
-    let mut file = File::open(path)?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-    Ok(buffer)
 }
 
 fn dump_ttc<'a>(

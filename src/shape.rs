@@ -1,24 +1,23 @@
 use std::convert::TryFrom;
-use std::fs::File;
-use std::io::{self, Read};
 
 use allsorts::binary::read::ReadScope;
-use allsorts::error::{ParseError, ShapingError};
+use allsorts::error::ShapingError;
 use allsorts::font_data_impl::read_cmap_subtable;
 use allsorts::gpos::{gpos_apply, Info};
-use allsorts::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
+use allsorts::gsub::{gsub_apply_default, RawGlyph};
 use allsorts::layout::{new_layout_cache, GDEFTable, LayoutTable, GPOS, GSUB};
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use allsorts::tag;
 
 use crate::cli::ShapeOpts;
+use crate::glyph;
 use crate::BoxError;
 
 pub fn main(opts: ShapeOpts) -> Result<(), BoxError> {
     let script = tag::from_string(&opts.script)?;
     let lang = tag::from_string(&opts.lang)?;
-    let buffer = read_file(&opts.font)?;
+    let buffer = crate::read_file(&opts.font)?;
     let fontfile = ReadScope::new(&buffer).read::<OpenTypeFile>()?;
 
     match fontfile.font {
@@ -27,13 +26,6 @@ pub fn main(opts: ShapeOpts) -> Result<(), BoxError> {
     }
 
     Ok(())
-}
-
-fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
-    let mut file = File::open(path)?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-    Ok(buffer)
 }
 
 fn shape_ttc<'a>(
@@ -72,7 +64,7 @@ fn shape_ttf<'a>(
     };
     let opt_glyphs_res: Result<Vec<_>, _> = text
         .chars()
-        .map(|ch| map_glyph(&cmap_subtable, ch))
+        .map(|ch| glyph::map(&cmap_subtable, ch))
         .collect();
     let opt_glyphs = opt_glyphs_res?;
     let mut glyphs = opt_glyphs.into_iter().flatten().collect();
@@ -125,32 +117,8 @@ fn shape_ttf<'a>(
 }
 
 fn make_dotted_circle(cmap_subtable: &CmapSubtable) -> Vec<RawGlyph<()>> {
-    match map_glyph(cmap_subtable, '\u{25cc}') {
+    match glyph::map(cmap_subtable, '\u{25cc}') {
         Ok(Some(raw_glyph)) => vec![raw_glyph],
         _ => Vec::new(),
-    }
-}
-
-fn map_glyph(cmap_subtable: &CmapSubtable, ch: char) -> Result<Option<RawGlyph<()>>, ParseError> {
-    if let Some(glyph_index) = cmap_subtable.map_glyph(ch as u32)? {
-        let glyph = make_glyph(ch, glyph_index);
-        Ok(Some(glyph))
-    } else {
-        Ok(None)
-    }
-}
-
-fn make_glyph(ch: char, glyph_index: u16) -> RawGlyph<()> {
-    RawGlyph {
-        unicodes: vec![ch],
-        glyph_index: Some(glyph_index),
-        liga_component_pos: 0,
-        glyph_origin: GlyphOrigin::Char(ch),
-        small_caps: false,
-        multi_subst_dup: false,
-        is_vert_alt: false,
-        fake_bold: false,
-        fake_italic: false,
-        extra_data: (),
     }
 }

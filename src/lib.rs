@@ -1,10 +1,13 @@
 pub mod cli;
 pub mod dump;
+mod glyph;
 pub mod shape;
 pub mod subset;
 
 use std::error::Error;
 use std::fmt;
+use std::fs::File;
+use std::io::{self, Read};
 
 type BoxError = Box<dyn Error>;
 
@@ -18,3 +21,10 @@ impl fmt::Display for ErrorMessage {
 }
 
 impl Error for ErrorMessage {}
+
+pub(crate) fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
+    let mut file = File::open(path)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
