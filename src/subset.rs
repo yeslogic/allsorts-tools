@@ -1,8 +1,11 @@
-use getopts::Options;
+use std::fs::File;
+use std::io::{self, Read, Write};
+use std::str;
+
 use itertools::Itertools;
 
 use allsorts::binary::read::ReadScope;
-use allsorts::error::{ParseError, ReadWriteError};
+use allsorts::error::ParseError;
 use allsorts::font_data_impl::read_cmap_subtable;
 use allsorts::fontfile::FontFile;
 use allsorts::gsub::{GlyphOrigin, RawGlyph};
@@ -10,92 +13,15 @@ use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::FontTableProvider;
 use allsorts::{macroman, subset, tag};
 
-use std::env;
-use std::fs::File;
-use std::io::{self, Read, Write};
-use std::str;
-use std::str::FromStr;
+use crate::cli::SubsetOpts;
+use crate::{BoxError, ErrorMessage};
 
-#[derive(Debug)]
-pub enum Error {
-    Io(io::Error),
-    Parse(ParseError),
-    ReadWrite(ReadWriteError),
-    Message(&'static str),
-}
-
-pub fn main() {
-    match run() {
-        Ok(()) => {}
-        Err(err) => {
-            eprint!("Unable to subset due to error: ");
-            match err {
-                Error::Io(io) => eprintln!("I/O error: {}", io),
-                Error::Parse(err) => eprintln!("Parse error: {:?}", err),
-                Error::ReadWrite(rw_err) => match rw_err {
-                    ReadWriteError::Read(err) => eprintln!("Parse error: {:?}", err),
-                    ReadWriteError::Write(err) => eprintln!("Write error: {:?}", err),
-                },
-                Error::Message(msg) => eprintln!("{}", msg),
-            }
-        }
-    }
-}
-
-fn run() -> Result<(), Error> {
-    let args: Vec<String> = env::args().collect();
-    let program = args[0].clone();
-
-    let mut opts = Options::new();
-    opts.optopt(
-        "t",
-        "text",
-        "subset the font to include glyphs from text",
-        "TEXT",
-    );
-    opts.optflag("h", "help", "print this help menu");
-    opts.optopt("i", "index", "index of the font to dump (for TTC)", "INDEX");
-
-    let matches = match opts.parse(&args[1..]) {
-        Ok(m) => m,
-        Err(f) => panic!(f.to_string()),
-    };
-
-    if matches.opt_present("h") {
-        print_usage(&program, opts);
-        return Ok(());
-    }
-
-    let text = matches
-        .opt_str("t")
-        .ok_or(Error::Message("-t TEXT is required"))?;
-
-    let index = matches
-        .opt_str("i")
-        .map(|index| usize::from_str(&index))
-        .transpose()
-        .map_err(|_err| ParseError::BadValue)?
-        .unwrap_or_default();
-
-    if matches.free.len() < 2 {
-        print_usage(&program, opts);
-        return Ok(());
-    }
-
-    let input = matches.free[0].as_str();
-    let output = matches.free[1].as_str();
-    let buffer = read_file(input)?;
+pub fn main(opts: SubsetOpts) -> Result<(), BoxError> {
+    let buffer = read_file(&opts.input)?;
     let font_file = ReadScope::new(&buffer).read::<FontFile>()?;
-    let provider = font_file.table_provider(index)?;
+    let provider = font_file.table_provider(opts.index)?;
 
-    subset(&provider, &text, output)?;
-
-    Ok(())
-}
-
-fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options] INPUT OUTPUT ", program);
-    eprint!("{}", opts.usage(&brief));
+    subset(&provider, &opts.text, &opts.output)
 }
 
 fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {
@@ -109,7 +35,7 @@ fn subset<'a, F: FontTableProvider>(
     font_provider: &F,
     text: &str,
     output_path: &str,
-) -> Result<(), Error> {
+) -> Result<(), BoxError> {
     // Work out the glyphs we want to keep from the text
     let mut glyphs = chars_to_glyphs(font_provider, text)?;
     let notdef = RawGlyph {
@@ -134,7 +60,7 @@ fn subset<'a, F: FontTableProvider>(
         .dedup()
         .collect_vec();
     if glyph_ids.is_empty() {
-        return Err(Error::Message("no glyphs left in font"));
+        return Err(ErrorMessage("no glyphs left in font").into());
     }
 
     println!("Number of glyphs in new font: {}", glyph_ids.len());
@@ -158,7 +84,7 @@ fn subset<'a, F: FontTableProvider>(
             });
         Some(Box::new(cmap0))
     } else {
-        return Err(Error::Message("not mac roman compatible"));
+        return Err(ErrorMessage("not mac roman compatible").into());
     };
 
     let new_font = subset::subset(font_provider, &glyph_ids, cmap0)?;
@@ -173,11 +99,11 @@ fn subset<'a, F: FontTableProvider>(
 fn chars_to_glyphs<'a, F: FontTableProvider>(
     font_provider: &F,
     text: &str,
-) -> Result<Vec<Option<RawGlyph<()>>>, Error> {
+) -> Result<Vec<Option<RawGlyph<()>>>, BoxError> {
     let cmap_data = font_provider.read_table_data(tag::CMAP)?;
     let cmap = ReadScope::new(&cmap_data).read::<Cmap>()?;
     let cmap_subtable =
-        read_cmap_subtable(&cmap)?.ok_or(Error::Message("no suitable cmap sub-table found"))?;
+        read_cmap_subtable(&cmap)?.ok_or(ErrorMessage("no suitable cmap sub-table found"))?;
 
     let glyphs = text
         .chars()
@@ -218,23 +144,5 @@ fn is_macroman(glyph: &RawGlyph<()>) -> bool {
             ..
         } => macroman::is_macroman(*chr),
         _ => false,
-    }
-}
-
-impl From<ParseError> for Error {
-    fn from(err: ParseError) -> Self {
-        Error::Parse(err)
-    }
-}
-
-impl From<ReadWriteError> for Error {
-    fn from(err: ReadWriteError) -> Self {
-        Error::ReadWrite(err)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Error::Io(err)
     }
 }

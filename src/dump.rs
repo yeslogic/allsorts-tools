@@ -1,6 +1,5 @@
 use atty::Stream;
 use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
-use getopts::Options;
 
 use allsorts::binary::read::ReadScope;
 use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
@@ -17,78 +16,34 @@ use allsorts::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
 use std::borrow::Borrow;
 use std::convert::TryFrom;
-use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::str::{self, FromStr};
+use std::str;
 
+use crate::cli::DumpOpts;
 use crate::{BoxError, ErrorMessage};
 
 type Tag = u32;
 
-pub fn main() {
-    match run() {
-        Ok(()) => {}
-        Err(err) => {
-            eprint!("Unable to dump due to error: {}", err);
-        }
-    }
-}
-
-pub fn run() -> Result<(), BoxError> {
-    let args: Vec<String> = env::args().collect();
-    let program = args[0].clone();
-
-    let mut opts = Options::new();
-    opts.optflag("c", "cff", "treat the file as a CFF font/table");
-    opts.optopt("t", "table", "dump the content of this table", "TABLE");
-    opts.optopt("i", "index", "index of the font to dump (for TTC)", "INDEX");
-    opts.optopt("g", "glyph", "dump the specified glyph", "INDEX");
-    opts.optflag("l", "loca", "print the loca table");
-    opts.optflag("h", "help", "print this help menu");
-
-    let matches = match opts.parse(&args[1..]) {
-        Ok(m) => m,
-        Err(f) => panic!(f.to_string()),
-    };
-
-    if matches.opt_present("h") {
-        print_usage(&program, opts);
-        return Ok(());
-    }
-
-    let table = matches
-        .opt_str("t")
+pub fn main(opts: DumpOpts) -> Result<(), BoxError> {
+    let table = opts
+        .table
         .map(|table| tag::from_string(&table))
         .transpose()?;
     if table.is_some() && atty::is(Stream::Stdout) {
         return Err(ErrorMessage("Not printing binary data to tty.").into());
     }
 
-    let index = matches
-        .opt_str("i")
-        .map(|index| usize::from_str(&index))
-        .transpose()
-        .map_err(|_err| ParseError::BadValue)?
-        .unwrap_or_default();
-
-    let filename = if !matches.free.is_empty() {
-        matches.free[0].as_str()
-    } else {
-        print_usage(&program, opts);
-        return Ok(());
-    };
-
-    let buffer = read_file(filename)?;
+    let buffer = read_file(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontFile>()?;
-    let table_provider = font_file.table_provider(index)?;
+    let table_provider = font_file.table_provider(opts.index)?;
 
-    if matches.opt_present("l") {
+    if opts.loca {
         dump_loca_table(&table_provider)?;
-    } else if let Ok(Some(glyph_id)) = matches.opt_get::<u16>("g") {
+    } else if let Some(glyph_id) = opts.glyph {
         dump_glyph(&table_provider, glyph_id)?;
-    } else if matches.opt_present("c") {
+    } else if opts.cff {
         dump_cff_table(ReadScope::new(&buffer))?
     } else {
         match &font_file {
@@ -97,18 +52,16 @@ pub fn run() -> Result<(), BoxError> {
                 OpenTypeFont::Collection(ttc) => dump_ttc(&font_file.scope, ttc, table)?,
             },
             FontFile::Woff(woff_file) => dump_woff(woff_file, table)?,
-            FontFile::Woff2(woff_file) => {
-                dump_woff2(woff_file.table_data_block_scope(), &woff_file, table, index)?
-            }
+            FontFile::Woff2(woff_file) => dump_woff2(
+                woff_file.table_data_block_scope(),
+                &woff_file,
+                table,
+                opts.index,
+            )?,
         }
     }
 
     Ok(())
-}
-
-fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options] FONTFILE ", program);
-    eprint!("{}", opts.usage(&brief));
 }
 
 fn read_file(path: &str) -> Result<Vec<u8>, io::Error> {

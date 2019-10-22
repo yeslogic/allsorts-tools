@@ -1,3 +1,7 @@
+use std::convert::TryFrom;
+use std::fs::File;
+use std::io::{self, Read};
+
 use allsorts::binary::read::ReadScope;
 use allsorts::error::{ParseError, ShapingError};
 use allsorts::font_data_impl::read_cmap_subtable;
@@ -7,39 +11,19 @@ use allsorts::layout::{new_layout_cache, GDEFTable, LayoutTable, GPOS, GSUB};
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use allsorts::tag;
-use std::convert::TryFrom;
-use std::env;
-use std::fs::File;
-use std::io::{self, Read};
 
-pub fn main() {
-    match run() {
-        Ok(()) => {}
-        Err(err) => {
-            eprint!("Shaping error: {}", err);
-        }
-    }
-}
+use crate::cli::ShapeOpts;
+use crate::BoxError;
 
-pub fn run() -> Result<(), ShapingError> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() != 5 {
-        println!("Usage: shape FONTFILE SCRIPT LANG TEXT");
-        return Ok(());
-    }
-
-    let filename = &args[1];
-    let script = tag::from_string(&args[2])?;
-    let lang = tag::from_string(&args[3])?;
-    let text = &args[4];
-    let buffer = read_file(filename).expect(&format!("unable to read {}", filename));
-
+pub fn main(opts: ShapeOpts) -> Result<(), BoxError> {
+    let script = tag::from_string(&opts.script)?;
+    let lang = tag::from_string(&opts.lang)?;
+    let buffer = read_file(&opts.font)?;
     let fontfile = ReadScope::new(&buffer).read::<OpenTypeFile>()?;
 
     match fontfile.font {
-        OpenTypeFont::Single(ttf) => shape_ttf(&fontfile.scope, ttf, script, lang, text)?,
-        OpenTypeFont::Collection(ttc) => shape_ttc(&fontfile.scope, ttc, script, lang, text)?,
+        OpenTypeFont::Single(ttf) => shape_ttf(&fontfile.scope, ttf, script, lang, &opts.text)?,
+        OpenTypeFont::Collection(ttc) => shape_ttc(&fontfile.scope, ttc, script, lang, &opts.text)?,
     }
 
     Ok(())
@@ -92,7 +76,7 @@ fn shape_ttf<'a>(
         .collect();
     let opt_glyphs = opt_glyphs_res?;
     let mut glyphs = opt_glyphs.into_iter().flatten().collect();
-    println!("glyphs before: {:?}", glyphs);
+    println!("glyphs before: {:#?}", glyphs);
     if let Some(gsub_record) = ttf.find_table_record(tag::GSUB) {
         let gsub_table = gsub_record.read_table(scope)?.read::<LayoutTable<GSUB>>()?;
         let gsub_cache = new_layout_cache::<GSUB>(gsub_table);
@@ -118,7 +102,7 @@ fn shape_ttf<'a>(
             vertical,
             &mut glyphs,
         )?;
-        println!("glyphs after: {:?}", glyphs);
+        println!("glyphs after: {:#?}", glyphs);
         match opt_gpos_cache {
             Some(gpos_cache) => {
                 let kerning = true;

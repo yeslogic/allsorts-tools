@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod dump;
 pub mod shape;
 pub mod subset;

@@ -11,7 +11,5 @@ allsorts = { path = "../prince/src/fonts/allsorts" }
 atty = "0.2"
 encoding_rs = "0.8.16"
 getopts = "0.2"
+gumdrop = "0.7.0"
 itertools = "0.8"
-#libc = "0.2"
-#log = "0.4"
-
