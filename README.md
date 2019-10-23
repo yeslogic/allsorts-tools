@@ -1,10 +1,20 @@
 <h1 align="center">
-  <img src="https://github.com/yeslogic/allsorts/raw/master/allsorts.svg" alt=""><br>
+  <img src="https://github.com/yeslogic/allsorts/raw/master/allsorts.svg?sanitize=1" alt=""><br>
   Allsorts Tools
 </h1>
 
 <div align="center">
   <strong>Example tools for the <a href="https://github.com/yeslogic/allsorts">Allsorts</a> font parser, shaping engine, and subsetter</strong>
+</div>
+
+<br>
+
+<div align="center">
+  <a href="https://travis-ci.com/yeslogic/allsorts-tools">
+    <img src="https://travis-ci.com/yeslogic/allsorts-tools.svg?token=4GA6ydxNNeb6XeELrMmg&amp;branch=master" alt="Build Status"></a>
+  <a href="https://github.com/yeslogic/allsorts-tools/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/yeslogic/allsorts-tools.svg" alt="License">
+  </a>
 </div>
 
 <br>
