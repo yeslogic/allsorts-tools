@@ -91,8 +91,9 @@ To build the tools ensure you have [Rust 1.38.0 or newer installed](https://www.
 
 ## Contributing
 
-Contributions are welcome, please refer to the Allsorts [CONTRIBUTING]()
-guide for more details.
+Contributions are welcome, please refer to the
+[Allsorts contributing guide](https://github.com/yeslogic/allsorts/blob/master/CONTRIBUTING.md)
+for more details.
 
 ## Code of Conduct
 
