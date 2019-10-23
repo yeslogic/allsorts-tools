@@ -9,7 +9,7 @@ name = "allsorts"
 path = "src/main.rs"
 
 [dependencies]
-allsorts = { path = "../prince/src/fonts/allsorts" }
+allsorts = { git = "ssh://git@github.com/yeslogic/allsorts.git" }
 atty = "0.2"
 encoding_rs = "0.8.16"
 getopts = "0.2"
