@@ -3,13 +3,14 @@ name = "allsorts-tools"
 version = "0.1.0"
 authors = ["YesLogic Pty. Ltd. <info@yeslogic.com>"]
 edition = "2018"
+publish = false
 
 [[bin]]
 name = "allsorts"
 path = "src/main.rs"
 
 [dependencies]
-allsorts = { git = "ssh://git@github.com/yeslogic/allsorts.git" }
+allsorts = "0.1"
 atty = "0.2"
 encoding_rs = "0.8.16"
 getopts = "0.2"

@@ -7,7 +7,7 @@ use allsorts::gpos::{gpos_apply, Info};
 use allsorts::gsub::{gsub_apply_default, RawGlyph};
 use allsorts::layout::{new_layout_cache, GDEFTable, LayoutTable, GPOS, GSUB};
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
-use allsorts::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
+use allsorts::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader, MaxpTable};
 use allsorts::tag;
 
 use crate::cli::ShapeOpts;
@@ -62,6 +62,12 @@ fn shape_ttf<'a>(
         println!("no suitable cmap subtable");
         return Ok(());
     };
+    let maxp = if let Some(maxp_scope) = ttf.read_table(&scope, tag::MAXP)? {
+        maxp_scope.read::<MaxpTable>()?
+    } else {
+        println!("no maxp table");
+        return Ok(());
+    };
     let opt_glyphs_res: Result<Vec<_>, _> = text
         .chars()
         .map(|ch| glyph::map(&cmap_subtable, ch))
@@ -92,6 +98,7 @@ fn shape_ttf<'a>(
             script,
             lang,
             vertical,
+            maxp.num_glyphs,
             &mut glyphs,
         )?;
         println!("glyphs after: {:#?}", glyphs);
