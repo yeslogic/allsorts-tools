@@ -33,7 +33,7 @@ pub fn main(opts: DumpOpts) -> Result<(), BoxError> {
         return Err(ErrorMessage("Not printing binary data to tty.").into());
     }
 
-    let buffer = crate::read_file(&opts.font)?;
+    let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontFile>()?;
     let table_provider = font_file.table_provider(opts.index)?;
