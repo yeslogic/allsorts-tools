@@ -16,7 +16,7 @@ use crate::cli::SubsetOpts;
 use crate::{glyph, BoxError, ErrorMessage};
 
 pub fn main(opts: SubsetOpts) -> Result<(), BoxError> {
-    let buffer = crate::read_file(&opts.input)?;
+    let buffer = std::fs::read(&opts.input)?;
     let font_file = ReadScope::new(&buffer).read::<FontFile>()?;
     let provider = font_file.table_provider(opts.index)?;
 

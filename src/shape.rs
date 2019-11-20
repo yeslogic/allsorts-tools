@@ -17,7 +17,7 @@ use crate::BoxError;
 pub fn main(opts: ShapeOpts) -> Result<(), BoxError> {
     let script = tag::from_string(&opts.script)?;
     let lang = tag::from_string(&opts.lang)?;
-    let buffer = crate::read_file(&opts.font)?;
+    let buffer = std::fs::read(&opts.font)?;
     let fontfile = ReadScope::new(&buffer).read::<OpenTypeFile>()?;
 
     match fontfile.font {
