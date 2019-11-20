@@ -7,7 +7,7 @@ use allsorts::gpos::{gpos_apply, Info};
 use allsorts::gsub::{gsub_apply_default, RawGlyph};
 use allsorts::layout::{new_layout_cache, GDEFTable, LayoutTable, GPOS, GSUB};
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
-use allsorts::tables::{OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader, MaxpTable};
+use allsorts::tables::{MaxpTable, OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use allsorts::tag;
 
 use crate::cli::ShapeOpts;
