@@ -4,23 +4,38 @@ use allsorts::gpos::{gpos_apply, Info, Placement};
 use allsorts::gsub::{gsub_apply_default, GlyphOrigin, RawGlyph};
 use allsorts::layout::{new_layout_cache, GDEFTable, LayoutCache, LayoutTable, GPOS, GSUB};
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
-use allsorts::tables::{HheaTable, HmtxTable, MaxpTable, OpenTypeFile, OpenTypeFont};
+use allsorts::tables::{HeadTable, HheaTable, HmtxTable, MaxpTable, OpenTypeFile, OpenTypeFont};
 use allsorts::tag;
 use anyhow::{anyhow, Result};
 use std::mem::transmute;
 
 #[derive(Debug)]
 enum ResolvedGlyph {
+    /// We shaped a glyph and have its info
     Resolved(Info),
+    /// We didn't resolve the glyph from this font, and have
+    /// the basic raw glyph info
     Unresolved(RawGlyph<()>),
 }
 
 #[derive(Debug)]
 pub struct Shaped {
     info: ResolvedGlyph,
+    /// Which of the fonts in the fallback list we resolved
+    /// the glyph from.
     font_index: usize,
+    /// How far to advance in the x direction after rendering
+    /// this glyph, measured in font units
     x_advance: i32,
+    /// How far to advance in the y direction after rendering
+    /// this glyph, measured in font units
     y_advance: i32,
+    /// How far to advance in the x direction after rendering
+    /// this glyph, measured as a fraction of the em square.
+    x_adv_pct: f32,
+    /// How far to advance in the y direction after rendering
+    /// this glyph, measured as a fraction of the em square.
+    y_adv_pct: f32,
 }
 
 fn main() -> Result<()> {
@@ -63,7 +78,24 @@ fn shape_into(
     loaded_fonts: &[LoadedFont],
     results: &mut Vec<Shaped>,
 ) -> Result<()> {
-    let first_pass = loaded_fonts[font_index].shape_text(text, font_index, script, lang)?;
+    let font = match loaded_fonts.get(font_index) {
+        Some(font) => font,
+        None => {
+            // We ran out of fallback fonts, so use a replacement
+            // character that is likely to be in one of those fonts
+            let mut alt_text = String::new();
+            let num_chars = text.chars().count();
+            for _ in 0..num_chars {
+                alt_text.push('?');
+            }
+            if alt_text == text {
+                // We already tried to fallback to this and failed
+                return Err(anyhow!("could not fallback to ? character"));
+            }
+            return shape_into(0, &alt_text, script, lang, loaded_fonts, results);
+        }
+    };
+    let first_pass = font.shape_text(text, font_index, script, lang)?;
 
     let mut item_iter = first_pass.into_iter();
     let mut fallback_run = String::new();
@@ -125,6 +157,7 @@ struct LoadedFont {
     hmtx: HmtxTable<'static>,
     hhea: HheaTable,
     num_glyphs: u16,
+    units_per_em: u16,
 
     // Must be last: this keeps the 'static items alive
     _scope: ReadScopeOwned,
@@ -147,6 +180,10 @@ impl LoadedFont {
             _ => panic!(),
         };
 
+        let head = otf
+            .read_table(&file.scope, tag::HEAD)?
+            .ok_or_else(|| anyhow!("HEAD table missing or broken"))?
+            .read::<HeadTable>()?;
         let cmap = otf
             .read_table(&file.scope, tag::CMAP)?
             .ok_or_else(|| anyhow!("CMAP table missing or broken"))?
@@ -202,6 +239,7 @@ impl LoadedFont {
             gsub_cache,
             gdef_table,
             num_glyphs,
+            units_per_em: head.units_per_em,
             _scope: owned_scope,
         })
     }
@@ -293,6 +331,8 @@ impl LoadedFont {
                     font_index,
                     x_advance: 0,
                     y_advance: 0,
+                    x_adv_pct: 0.,
+                    y_adv_pct: 0.,
                 });
 
                 input_glyph = glyph_iter
@@ -321,11 +361,17 @@ impl LoadedFont {
             // Adjust for distance placement
             match glyph_info.placement {
                 Placement::Distance(dx, dy) => {
+                    let x_advance = horizontal_advance + dx;
+                    let y_advance = dy;
+                    let x_adv_pct = x_advance as f32 / self.units_per_em as f32;
+                    let y_adv_pct = y_advance as f32 / self.units_per_em as f32;
                     pos.push(Shaped {
                         info: ResolvedGlyph::Resolved(glyph_info),
                         font_index,
-                        x_advance: horizontal_advance + dx,
-                        y_advance: dy,
+                        x_advance,
+                        y_advance,
+                        x_adv_pct,
+                        y_adv_pct,
                     });
                 }
                 Placement::Anchor(_, _) | Placement::None => {
@@ -333,7 +379,9 @@ impl LoadedFont {
                         info: ResolvedGlyph::Resolved(glyph_info),
                         font_index,
                         x_advance: horizontal_advance,
+                        x_adv_pct: horizontal_advance as f32 / self.units_per_em as f32,
                         y_advance: 0,
+                        y_adv_pct: 0.,
                     });
                 }
             }
