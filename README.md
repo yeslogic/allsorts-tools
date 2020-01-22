@@ -92,12 +92,22 @@ script. It prints out the glyphs before and after shaping.
 
 ## Building and Installing
 
+### From Source
+
 **Minimum Supported Rust Version:** 1.38.0
 
 To build the tools ensure you have [Rust 1.38.0 or newer installed](https://www.rust-lang.org/tools/install).
 
 * Build: `cargo build --release`
 * Install: `cargo install --path .`
+
+### Arch Linux
+
+There is an [AUR package for `allsorts-tools`](https://aur.archlinux.org/packages/allsorts-tools/):
+
+    git clone https://aur.archlinux.org/allsorts-tools.git
+    cd allsorts-tools
+    makepkg -si
 
 ## Contributing
 
