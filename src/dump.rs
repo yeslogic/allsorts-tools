@@ -8,7 +8,8 @@ use allsorts::fontfile::FontFile;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::{
-    FontTableProvider, HeadTable, MaxpTable, NameTable, OffsetTable, OpenTypeFont, TTCHeader,
+    FontTableProvider, HeadTable, HheaTable, HmtxTable, MaxpTable, NameTable, OffsetTable,
+    OpenTypeFont, TTCHeader,
 };
 use allsorts::tag::{self, DisplayTag};
 use allsorts::woff::WoffFile;
@@ -40,6 +41,8 @@ pub fn main(opts: DumpOpts) -> Result<(), BoxError> {
 
     if opts.loca {
         dump_loca_table(&table_provider)?;
+    } else if opts.hmtx {
+        dump_hmtx_table(&table_provider)?;
     } else if let Some(glyph_id) = opts.glyph {
         dump_glyph(&table_provider, glyph_id)?;
     } else if opts.cff {
@@ -261,6 +264,26 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
         }
         println!("{:?}", name);
         println!();
+    }
+
+    Ok(())
+}
+
+fn dump_hmtx_table(provider: &impl FontTableProvider) -> Result<(), ParseError> {
+    let table = provider.table_data(tag::MAXP)?.expect("no maxp table");
+    let scope = ReadScope::new(table.borrow());
+    let maxp = scope.read::<MaxpTable>()?;
+
+    let hhea = ReadScope::new(&provider.read_table_data(tag::HHEA)?).read::<HheaTable>()?;
+
+    let num_glyphs = usize::from(maxp.num_glyphs);
+    let num_metrics = usize::from(hhea.num_h_metrics);
+    let hmtx_data = provider.table_data(tag::HMTX)?.expect("no hmtx table");
+    let hmtx = ReadScope::new(&hmtx_data).read_dep::<HmtxTable<'_>>((num_glyphs, num_metrics))?;
+
+    println!("hmtx:");
+    for (index, metrics) in hmtx.h_metrics.iter().enumerate() {
+        println!("{}: {:?}", index, metrics);
     }
 
     Ok(())

@@ -42,6 +42,9 @@ pub struct DumpOpts {
     #[options(help = "dump the specified glyph", meta = "GLYPH_ID")]
     pub glyph: Option<u16>,
 
+    #[options(help = "print the hmtx table")]
+    pub hmtx: bool,
+
     #[options(help = "print the loca table")]
     pub loca: bool,
 
