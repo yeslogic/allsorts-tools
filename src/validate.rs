@@ -8,11 +8,11 @@ use allsorts::tables::loca::LocaTable;
 use allsorts::tables::{FontTableProvider, HeadTable, MaxpTable};
 use allsorts::tag;
 
-use crate::cli::ParseOpts;
+use crate::cli::ValidateOpts;
 use crate::BoxError;
 use std::convert::TryFrom;
 
-pub fn main(opts: ParseOpts) -> Result<(), BoxError> {
+pub fn main(opts: ValidateOpts) -> Result<(), BoxError> {
     let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontFile>()?;

@@ -15,7 +15,7 @@ pub enum Command {
     Dump(DumpOpts),
 
     #[options(help = "parse the supplied font, reporting any failures")]
-    Parse(ParseOpts),
+    Validate(ValidateOpts),
 
     #[options(help = "subset a font")]
     Subset(SubsetOpts),
@@ -56,7 +56,7 @@ pub struct DumpOpts {
 }
 
 #[derive(Debug, Options)]
-pub struct ParseOpts {
+pub struct ValidateOpts {
     #[options(help = "print help message")]
     pub help: bool,
 
