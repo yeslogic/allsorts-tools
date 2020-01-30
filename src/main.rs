@@ -1,7 +1,7 @@
 use gumdrop::Options;
 
 use allsorts_tools::cli::*;
-use allsorts_tools::{dump, shape, subset};
+use allsorts_tools::{dump, parse, shape, subset};
 
 fn main() {
     let cli = Cli::parse_args_default_or_exit();
@@ -10,6 +10,7 @@ fn main() {
         Some(Command::Dump(opts)) => dump::main(opts),
         Some(Command::Shape(opts)) => shape::main(opts),
         Some(Command::Subset(opts)) => subset::main(opts),
+        Some(Command::Parse(opts)) => parse::main(opts),
         None => usage(),
     };
 

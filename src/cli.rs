@@ -14,6 +14,9 @@ pub enum Command {
     #[options(help = "dump font information")]
     Dump(DumpOpts),
 
+    #[options(help = "parse the supplied font, reporting any failures")]
+    Parse(ParseOpts),
+
     #[options(help = "subset a font")]
     Subset(SubsetOpts),
 
@@ -49,6 +52,15 @@ pub struct DumpOpts {
     pub loca: bool,
 
     #[options(free, required, help = "path to font to dump")]
+    pub font: String,
+}
+
+#[derive(Debug, Options)]
+pub struct ParseOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(free, required, help = "path to font")]
     pub font: String,
 }
 
