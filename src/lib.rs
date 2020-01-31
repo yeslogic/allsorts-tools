@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod dump;
 mod glyph;
+pub mod has_table;
 pub mod shape;
 pub mod subset;
 pub mod validate;

@@ -12,17 +12,17 @@ use crate::cli::ValidateOpts;
 use crate::BoxError;
 use std::convert::TryFrom;
 
-pub fn main(opts: ValidateOpts) -> Result<(), BoxError> {
+pub fn main(opts: ValidateOpts) -> Result<i32, BoxError> {
     let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontFile>()?;
     let table_provider = font_file.table_provider(0)?; // TODO: Handle all fonts in collection
     let failed = dump_glyphs(&opts.font, &table_provider)?;
     if failed {
-        std::process::exit(1);
+        Ok(1)
+    } else {
+        Ok(0)
     }
-
-    Ok(())
 }
 
 fn dump_glyphs(path: &str, provider: &impl FontTableProvider) -> Result<bool, ParseError> {

@@ -32,6 +32,7 @@ not rely on them for production workflows.
 Available tools:
 
 * `dump` — dump font information
+* `has-table` — check if a font has a particular table
 * `shape` — apply shaping to glyphs from a font
 * `subset` — subset a font
 * `validate` — parse the supplied font, reporting any failures
@@ -77,10 +78,28 @@ redirected to a file. E.g. `allsorts dump -t glyf > glyf.bin`
      - charset: Custom
      - variant: CID
 
+### `has-table`
+
+The `has-table` tool checks if the supplied font file contains the table passed
+via the `-t` argument.  If the font contains the table it exits with status
+success (0), if the font doesn't not contain the table it exits with status 1.
+The `-p` option makes the tool print the path to the font if it contains the
+table.
+
+This tool is handy combined with `find`, to locate fonts that have the desired table.
+
+#### Example
+
+In this example, we search the current directory for files ending in `ttf`,
+`otf`, or `otc` and check to see if they contain an `EBLC` table. If the table
+is found the path to the font is printed.
+
+    find . -regextype posix-extended -type f -iregex '.*\.(ttf|otf|otc)$' -exec allsorts has-table -t EBLC -p {} \;
+
 ### `subset`
 
-The `subset` tool takes a source font and some text and writes a new version of the source font only
-containing the glyphs required for the supplied text.
+The `subset` tool takes a source font and some text and writes a new version of
+the source font only containing the glyphs required for the supplied text.
 
 #### Example
 

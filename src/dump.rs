@@ -25,7 +25,7 @@ use crate::{BoxError, ErrorMessage};
 
 type Tag = u32;
 
-pub fn main(opts: DumpOpts) -> Result<(), BoxError> {
+pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
     let table = opts
         .table
         .map(|table| tag::from_string(&table))
@@ -63,7 +63,7 @@ pub fn main(opts: DumpOpts) -> Result<(), BoxError> {
         }
     }
 
-    Ok(())
+    Ok(0)
 }
 
 fn dump_ttc<'a>(

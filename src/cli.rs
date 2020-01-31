@@ -14,6 +14,9 @@ pub enum Command {
     #[options(help = "dump font information")]
     Dump(DumpOpts),
 
+    #[options(help = "check if a font has a particular table")]
+    HasTable(HasTableOpts),
+
     #[options(help = "parse the supplied font, reporting any failures")]
     Validate(ValidateOpts),
 
@@ -50,6 +53,28 @@ pub struct DumpOpts {
 
     #[options(help = "print the loca table")]
     pub loca: bool,
+
+    #[options(free, required, help = "path to font to dump")]
+    pub font: String,
+}
+
+#[derive(Debug, Options)]
+pub struct HasTableOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(help = "table to check for", meta = "TABLE")]
+    pub table: String,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
+    #[options(help = "print file name")]
+    pub print_file: bool,
 
     #[options(free, required, help = "path to font to dump")]
     pub font: String,
