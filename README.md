@@ -29,6 +29,13 @@ not rely on them for production workflows.
 
 ## Tools
 
+Available tools:
+
+* `dump` — dump font information
+* `shape` — apply shaping to glyphs from a font
+* `subset` — subset a font
+* `validate` — parse the supplied font, reporting any failures
+
 ### `dump`
 
 The `dump` tool prints or extract information from a font file.
@@ -89,6 +96,21 @@ script. It prints out the glyphs before and after shaping.
 
     $ shape -f fonts/devanagari/AnnapurnaSIL-Regular.ttf -s deva -l HIN 'शब्दों और वाक्यों की तरह'
     # output omitted
+
+### `validate`
+
+The `validate` tool attempts to parse all the glyphs (or various DICTs in the
+case of CFF) in the supplied font. It reports any errors encountered but is
+otherwise silent. This command was useful for bulk testing Allsorts against a
+large repertoire of real world fonts.
+
+#### Example
+
+    $ allsorts validate ../allsorts/tests/fonts/bengali/Lohit-Bengali.ttf
+
+#### Bulk Validation Example
+
+    $ fd '\.(ttf|otf|ttc)$' /usr/share/fonts | sort | parallel --bar allsorts validate {}
 
 ## Building and Installing
 

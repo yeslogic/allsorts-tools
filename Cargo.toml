@@ -1,6 +1,6 @@
 [package]
 name = "allsorts-tools"
-version = "0.1.0"
+version = "0.3.0"
 authors = ["YesLogic Pty. Ltd. <info@yeslogic.com>"]
 edition = "2018"
 publish = false
@@ -10,9 +10,8 @@ name = "allsorts"
 path = "src/main.rs"
 
 [dependencies]
-allsorts = "0.1"
-atty = "0.2"
+allsorts = "0.2.0"
+atty = "0.2.13"
 encoding_rs = "0.8.16"
-getopts = "0.2"
 gumdrop = "0.7.0"
-itertools = "0.8"
+itertools = "0.8.0"
