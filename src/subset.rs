@@ -15,12 +15,14 @@ use allsorts::{macroman, subset, tag};
 use crate::cli::SubsetOpts;
 use crate::{glyph, BoxError, ErrorMessage};
 
-pub fn main(opts: SubsetOpts) -> Result<(), BoxError> {
+pub fn main(opts: SubsetOpts) -> Result<i32, BoxError> {
     let buffer = std::fs::read(&opts.input)?;
     let font_file = ReadScope::new(&buffer).read::<FontFile>()?;
     let provider = font_file.table_provider(opts.index)?;
 
-    subset(&provider, &opts.text, &opts.output)
+    subset(&provider, &opts.text, &opts.output)?;
+
+    Ok(0)
 }
 
 fn subset<'a, F: FontTableProvider>(

@@ -14,7 +14,7 @@ use crate::cli::ShapeOpts;
 use crate::glyph;
 use crate::BoxError;
 
-pub fn main(opts: ShapeOpts) -> Result<(), BoxError> {
+pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
     let script = tag::from_string(&opts.script)?;
     let lang = tag::from_string(&opts.lang)?;
     let buffer = std::fs::read(&opts.font)?;
@@ -25,7 +25,7 @@ pub fn main(opts: ShapeOpts) -> Result<(), BoxError> {
         OpenTypeFont::Collection(ttc) => shape_ttc(&fontfile.scope, ttc, script, lang, &opts.text)?,
     }
 
-    Ok(())
+    Ok(0)
 }
 
 fn shape_ttc<'a>(
