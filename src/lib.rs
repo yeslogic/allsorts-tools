@@ -1,3 +1,4 @@
+pub mod bitmaps;
 pub mod cli;
 pub mod dump;
 mod glyph;

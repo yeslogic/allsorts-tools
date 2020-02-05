@@ -11,6 +11,9 @@ pub struct Cli {
 
 #[derive(Debug, Options)]
 pub enum Command {
+    #[options(help = "dump all bitmaps in EBDT/CBDT tables")]
+    Bitmaps(BitmapOpts),
+
     #[options(help = "dump font information")]
     Dump(DumpOpts),
 
@@ -25,6 +28,25 @@ pub enum Command {
 
     #[options(help = "apply shaping to glyphs from a font")]
     Shape(ShapeOpts),
+}
+
+#[derive(Debug, Options)]
+pub struct BitmapOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
+    #[options(required, help = "path to directory to write to")]
+    pub output: String,
+
+    #[options(free, required, help = "path to font to dump")]
+    pub font: String,
 }
 
 #[derive(Debug, Options)]

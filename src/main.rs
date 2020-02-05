@@ -2,12 +2,13 @@ use gumdrop::Options;
 use std::process;
 
 use allsorts_tools::cli::*;
-use allsorts_tools::{dump, has_table, shape, subset, validate};
+use allsorts_tools::{bitmaps, dump, has_table, shape, subset, validate};
 
 fn main() {
     let cli = Cli::parse_args_default_or_exit();
 
     let res = match cli.command {
+        Some(Command::Bitmaps(opts)) => bitmaps::main(opts),
         Some(Command::Dump(opts)) => dump::main(opts),
         Some(Command::HasTable(opts)) => has_table::main(opts),
         Some(Command::Shape(opts)) => shape::main(opts),

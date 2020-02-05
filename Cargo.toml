@@ -10,8 +10,10 @@ name = "allsorts"
 path = "src/main.rs"
 
 [dependencies]
-allsorts = "0.2.0"
+allsorts = "0.3.0"
 atty = "0.2.13"
+endio_bit = "0.1.0"
 encoding_rs = "0.8.16"
 gumdrop = "0.7.0"
 itertools = "0.8.0"
+png = "0.15.3"
