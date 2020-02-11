@@ -57,7 +57,7 @@ pub struct DumpOpts {
     #[options(help = "treat the file as a CFF font/table")]
     pub cff: bool,
 
-    #[options(help = "dump the content of this table", meta = "TABLE")]
+    #[options(help = "dump the raw binary content of this table", meta = "TABLE")]
     pub table: Option<String>,
 
     #[options(
@@ -76,7 +76,10 @@ pub struct DumpOpts {
     #[options(help = "include glyph names in output", no_short)]
     pub glyph_names: bool,
 
-    #[options(help = "print the hmtx table")]
+    #[options(help = "print the head table", no_short)]
+    pub head: bool,
+
+    #[options(help = "print the hmtx table", no_short)]
     pub hmtx: bool,
 
     #[options(help = "print the loca table")]
