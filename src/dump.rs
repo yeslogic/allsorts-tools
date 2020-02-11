@@ -51,6 +51,8 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
 
     if opts.loca {
         dump_loca_table(&table_provider)?;
+    } else if opts.head {
+        dump_head_table(&table_provider)?;
     } else if opts.hmtx {
         dump_hmtx_table(&table_provider)?;
     } else if let Some(glyph_id) = opts.glyph {
@@ -296,6 +298,12 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
         println!();
     }
 
+    Ok(())
+}
+
+fn dump_head_table(provider: &impl FontTableProvider) -> Result<(), ParseError> {
+    let head = ReadScope::new(&provider.read_table_data(tag::HEAD)?).read::<HeadTable>()?;
+    println!("{:#?}", head);
     Ok(())
 }
 
