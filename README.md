@@ -31,11 +31,45 @@ not rely on them for production workflows.
 
 Available tools:
 
+* `bitmaps` — dump bitmaps from bitmap fonts
 * `dump` — dump font information
 * `has-table` — check if a font has a particular table
 * `shape` — apply shaping to glyphs from a font
 * `subset` — subset a font
 * `validate` — parse the supplied font, reporting any failures
+
+### `bitmaps`
+
+The `bitmaps` tool extracts bitmaps from fonts containing glyph bitmaps in
+either the `EBLC`/`EBDT` or `CBLC`/`CBDT` tables.
+
+`-o` is the path to the directory to write the bitmaps to. It will be created
+if it does not exist.
+
+The images are written out as PNGs in a sub-directory for each strike (size).
+The format is `{ppem_x}x{ppem_y}@{bit_depth}`, the files are named
+`{glyph_id}.png`:
+
+    terminus
+    ├── 12x12@1
+    │  ├── 0.png
+    │  ├── 1.png
+    │  ├── 2.png
+    │  ├── 3.png
+    │  ├── 4.png
+    │  ├── 5.png
+    │  ├── 6.png
+    │  ├── 7.png
+    ⋮  ⋮
+    ├── 14x14@1
+    │  ├── 0.png
+    ⋮  ⋮
+    └── 32x32@1
+    ⋮  ⋮
+
+#### Example
+
+    allsorts bitmaps -o noto-color-emoji NotoColorEmoji.ttf
 
 ### `dump`
 
@@ -54,7 +88,7 @@ redirected to a file. E.g. `allsorts dump -t glyf > glyf.bin`
 
 `-l` option prints out all offsets in the `loca` table in the font.
 
-### Example
+#### Example
 
     $ allsorts dump noto-subset.otd | head
     TTF
