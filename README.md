@@ -31,7 +31,7 @@ not rely on them for production workflows.
 
 Available tools:
 
-* `bitmaps` — dump bitmaps from bitmaps fonts
+* `bitmaps` — dump bitmaps from bitmap fonts
 * `dump` — dump font information
 * `has-table` — check if a font has a particular table
 * `shape` — apply shaping to glyphs from a font
@@ -69,7 +69,7 @@ The format is `{ppem_x}x{ppem_y}@{bit_depth}`, the files are named
 
 #### Example
 
-    allorts bitmaps -o noto-color-emoji NotoColorEmoji.ttf
+    allsorts bitmaps -o noto-color-emoji NotoColorEmoji.ttf
 
 ### `dump`
 
