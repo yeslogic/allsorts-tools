@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 allsorts = "0.3.0"
 atty = "0.2.13"
-endio_bit = "0.1.0"
+bitreader = "0.3.2"
 encoding_rs = "0.8.16"
 gumdrop = "0.7.0"
 itertools = "0.8.0"
