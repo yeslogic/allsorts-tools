@@ -1,10 +1,10 @@
 use std::borrow::Borrow;
+use std::fs;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
-use std::{fs, io};
 
-use endio_bit::BitReader;
+use bitreader::{BitReader, BitReaderError};
 
 use allsorts::binary::read::ReadScope;
 use allsorts::bitmap::{self, BitDepth, BitmapSize, CBDTTable, CBLCTable, GlyphBitmapData};
@@ -173,7 +173,7 @@ fn unpack_bit_aligned_data(
     width: u8,
     height: u8,
     data: &[u8],
-) -> io::Result<Vec<u8>> {
+) -> Result<Vec<u8>, BitReaderError> {
     let bits_per_row = bit_depth as usize * usize::from(width);
     let whole_bytes_per_row = bits_per_row >> 3;
     let remaining_bits = (bits_per_row & 7) as u8;
@@ -185,12 +185,12 @@ fn unpack_bit_aligned_data(
     for _ in 0..height {
         // Read whole bytes, then the remainder
         for byte in image_data[offset..(offset + whole_bytes_per_row)].iter_mut() {
-            *byte = reader.read_bits(8)?;
+            *byte = reader.read_u8(8)?;
         }
         offset += whole_bytes_per_row;
         if remaining_bits != 0 {
             *image_data.get_mut(offset).unwrap() =
-                reader.read_bits(remaining_bits)? << (8 - remaining_bits);
+                reader.read_u8(remaining_bits)? << (8 - remaining_bits);
             offset += 1;
         }
     }
