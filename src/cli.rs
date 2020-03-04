@@ -116,12 +116,11 @@ pub struct SubsetOpts {
     #[options(help = "print help message")]
     pub help: bool,
 
-    #[options(
-        required,
-        help = "subset the font to include glyphs from TEXT",
-        meta = "TEXT"
-    )]
-    pub text: String,
+    #[options(help = "subset the font to include glyphs from TEXT", meta = "TEXT")]
+    pub text: Option<String>,
+
+    #[options(help = "include all glyphs in the subset font")]
+    pub all: bool,
 
     #[options(
         help = "index of the font to dump (for TTC, WOFF2)",
