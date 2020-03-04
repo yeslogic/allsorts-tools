@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Write;
 use std::str;
@@ -9,7 +10,7 @@ use allsorts::font_data_impl::read_cmap_subtable;
 use allsorts::fontfile::FontFile;
 use allsorts::gsub::{GlyphOrigin, RawGlyph};
 use allsorts::tables::cmap::Cmap;
-use allsorts::tables::FontTableProvider;
+use allsorts::tables::{FontTableProvider, MaxpTable};
 use allsorts::{macroman, subset, tag};
 
 use crate::cli::SubsetOpts;
@@ -20,12 +21,39 @@ pub fn main(opts: SubsetOpts) -> Result<i32, BoxError> {
     let font_file = ReadScope::new(&buffer).read::<FontFile>()?;
     let provider = font_file.table_provider(opts.index)?;
 
-    subset(&provider, &opts.text, &opts.output)?;
+    if opts.text.is_none() && !opts.all {
+        eprintln!("One of --text or --all is required");
+        return Ok(1);
+    }
+
+    if let Some(text) = opts.text {
+        subset_text(&provider, &text, &opts.output)?;
+    } else {
+        subset_all(&provider, &opts.output)?;
+    }
 
     Ok(0)
 }
 
-fn subset<'a, F: FontTableProvider>(
+fn subset_all<'a, F: FontTableProvider>(
+    font_provider: &F,
+    output_path: &str,
+) -> Result<(), BoxError> {
+    let table = font_provider.table_data(tag::MAXP)?.expect("no maxp table");
+    let scope = ReadScope::new(table.borrow());
+    let maxp = scope.read::<MaxpTable>()?;
+
+    let glyph_ids = (0..maxp.num_glyphs).collect_vec();
+    let new_font = subset::subset(font_provider, &glyph_ids, None)?;
+
+    // Write out the new font
+    let mut output = File::create(output_path)?;
+    output.write_all(&new_font)?;
+
+    Ok(())
+}
+
+fn subset_text<'a, F: FontTableProvider>(
     font_provider: &F,
     text: &str,
     output_path: &str,
