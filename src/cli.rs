@@ -70,6 +70,9 @@ pub struct DumpOpts {
     #[options(help = "dump the specified glyph", meta = "GLYPH_ID")]
     pub glyph: Option<u16>,
 
+    #[options(no_short, help = "print the glyph names in the font")]
+    pub glyph_names: bool,
+
     #[options(help = "print the hmtx table")]
     pub hmtx: bool,
 

@@ -22,6 +22,7 @@ use std::str;
 
 use crate::cli::DumpOpts;
 use crate::{BoxError, ErrorMessage};
+use allsorts::post::PostTable;
 
 type Tag = u32;
 
@@ -60,6 +61,9 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
                 table,
                 opts.index,
             )?,
+        }
+        if opts.glyph_names {
+            print_glyph_names(&table_provider)?;
         }
     }
 
@@ -503,4 +507,27 @@ fn get_name_meaning(name_id: u16) -> Option<&'static str> {
         25 => Some("Variations PostScript Name Prefix"),
         _ => None,
     }
+}
+
+fn print_glyph_names(provider: &impl FontTableProvider) -> Result<(), ParseError> {
+    let table = provider.table_data(tag::MAXP)?.expect("no maxp table");
+    let scope = ReadScope::new(table.borrow());
+    let maxp = scope.read::<MaxpTable>()?;
+
+    let table = provider.table_data(tag::CMAP)?.expect("no cmap table");
+    let scope = ReadScope::new(table.borrow());
+    let cmap = scope.read::<Cmap<'_>>()?;
+
+    let table = provider.table_data(tag::POST)?;
+    let scope = table.as_ref().map(|data| ReadScope::new(data.borrow()));
+    let post = scope
+        .map(|scope| scope.read::<PostTable<'_>>())
+        .transpose()?;
+
+    let mappings = allsorts::glyph_info::glyph_names(maxp.num_glyphs, &cmap, &post);
+    for (glyph_id, name) in mappings.into_iter().enumerate() {
+        println!("{}: {}", glyph_id, name);
+    }
+
+    Ok(())
 }
