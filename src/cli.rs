@@ -57,6 +57,9 @@ pub struct DumpOpts {
     #[options(help = "treat the file as a CFF font/table")]
     pub cff: bool,
 
+    #[options(no_short, help = "print the cmap encoding records")]
+    pub encodings: bool,
+
     #[options(help = "dump the content of this table", meta = "TABLE")]
     pub table: Option<String>,
 

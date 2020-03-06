@@ -23,6 +23,7 @@ use std::str;
 use crate::cli::DumpOpts;
 use crate::{BoxError, ErrorMessage};
 use allsorts::post::PostTable;
+use allsorts::tables::cmap::{Cmap, CmapSubtable, EncodingId, PlatformId};
 
 type Tag = u32;
 
@@ -64,6 +65,9 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
         }
         if opts.glyph_names {
             print_glyph_names(&table_provider)?;
+        }
+        if opts.encodings {
+            print_cmap_encodings(&table_provider)?;
         }
     }
 
@@ -524,9 +528,42 @@ fn print_glyph_names(provider: &impl FontTableProvider) -> Result<(), ParseError
         .map(|scope| scope.read::<PostTable<'_>>())
         .transpose()?;
 
-    let mappings = allsorts::glyph_info::glyph_names(maxp.num_glyphs, &cmap, &post);
+    let mappings = allsorts::glyph_info::glyph_names(maxp.num_glyphs, &cmap, &None);
     for (glyph_id, name) in mappings.into_iter().enumerate() {
         println!("{}: {}", glyph_id, name);
+    }
+
+    Ok(())
+}
+
+fn print_cmap_encodings(provider: &impl FontTableProvider) -> Result<(), ParseError> {
+    let table = provider.table_data(tag::CMAP)?.expect("no cmap table");
+    let scope = ReadScope::new(table.borrow());
+    let cmap = scope.read::<Cmap<'_>>()?;
+
+    println!("cmap encodings:");
+    for record in cmap.encoding_records() {
+        print!(
+            " - {:?} {:?} ",
+            PlatformId(record.platform_id),
+            EncodingId(record.encoding_id)
+        );
+        if let Ok(subtable) = cmap
+            .scope
+            .offset(usize::try_from(record.offset)?)
+            .read::<CmapSubtable<'_>>()
+        {
+            match subtable {
+                CmapSubtable::Format0 { .. } => println!("Sub-table format 0"),
+                CmapSubtable::Format2 { .. } => println!("Sub-table format 2"),
+                CmapSubtable::Format4 { .. } => println!("Sub-table format 4"),
+                CmapSubtable::Format6 { .. } => println!("Sub-table format 6"),
+                CmapSubtable::Format10 { .. } => println!("Sub-table format 10"),
+                CmapSubtable::Format12 { .. } => println!("Sub-table format 12"),
+            }
+        } else {
+            println!("Unable to read sub-table.");
+        }
     }
 
     Ok(())
