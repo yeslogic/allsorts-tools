@@ -7,10 +7,10 @@ use std::path::Path;
 use bitreader::{BitReader, BitReaderError};
 
 use allsorts::binary::read::ReadScope;
-use allsorts::bitmap::{self, BitDepth, BitmapSize, CBDTTable, CBLCTable, GlyphBitmapData};
+use allsorts::bitmap::{self, BitDepth, CBDTTable, CBLCTable, GlyphBitmapData, MatchingStrike};
 use allsorts::fontfile::FontFile;
 use allsorts::tables::FontTableProvider;
-use allsorts::tag::{self};
+use allsorts::tag;
 
 use crate::cli::BitmapOpts;
 use crate::BoxError;
@@ -39,8 +39,8 @@ pub fn main(opts: BitmapOpts) -> Result<i32, BoxError> {
         fs::create_dir(output_path)?;
     }
 
-    for strike in cblc.bitmap_sizes.iter_res() {
-        let strike = strike?;
+    for strike in &cblc.bitmap_sizes {
+        let strike = &strike.inner;
         let strike_path = output_path.join(&format!(
             "{}x{}@{}",
             strike.ppem_x, strike.ppem_y, strike.bit_depth as u8
@@ -48,68 +48,71 @@ pub fn main(opts: BitmapOpts) -> Result<i32, BoxError> {
         if !strike_path.exists() {
             fs::create_dir(&strike_path)?;
         }
-        dump_bitmaps(strike, &strike_path, &cblc, &cbdt)?;
+        for glyph_id in strike.start_glyph_index..=strike.end_glyph_index {
+            if let Some(matching_strike) =
+                cblc.find_strike(glyph_id, strike.ppem_x, strike.bit_depth)
+            {
+                dump_bitmap(matching_strike, glyph_id, &strike_path, &cbdt)?;
+            }
+        }
     }
 
     Ok(0)
 }
 
-fn dump_bitmaps<'a>(
-    strike: BitmapSize,
+fn dump_bitmap<'a>(
+    strike: MatchingStrike,
+    glyph_id: u16,
     path: &Path,
-    cblc: &'a CBLCTable<'a>,
     cbdt: &'a CBDTTable<'a>,
 ) -> Result<(), BoxError> {
-    for glyph_id in strike.start_glyph_index..=strike.end_glyph_index {
-        if let Some(bitmap) =
-            bitmap::lookup(glyph_id, strike.ppem_x, BitDepth::ThirtyTwo, cblc, cbdt)?
-        {
-            let glyph_path = path.join(&format!("{}.png", glyph_id));
-            match bitmap {
-                (_, GlyphBitmapData::Format17 { data, .. })
-                | (_, GlyphBitmapData::Format18 { data, .. })
-                | (_, GlyphBitmapData::Format19 { data, .. }) => {
-                    // Already PNG, just write it out
-                    fs::write(&glyph_path, data)?;
+    let res = bitmap::lookup(glyph_id, &strike, cbdt);
+    if let Some(bitmap) = res? {
+        let glyph_path = path.join(&format!("{}.png", glyph_id));
+        match bitmap {
+            GlyphBitmapData::Format17 { data, .. }
+            | GlyphBitmapData::Format18 { data, .. }
+            | GlyphBitmapData::Format19 { data, .. } => {
+                // Already PNG, just write it out
+                fs::write(&glyph_path, data)?;
+            }
+            GlyphBitmapData::Format8 { components, .. }
+            | GlyphBitmapData::Format9 { components, .. } => {
+                let ids = components
+                    .iter()
+                    .map(|component| component.glyph_id.to_string())
+                    .collect::<Vec<_>>();
+                println!("glyph {} is comprised of {}", glyph_id, ids.join(", "))
+            }
+            bitmap => {
+                // Convert to PNG and write out
+                if bitmap.width() == 0 || bitmap.height() == 0 {
+                    println!(
+                        "glyph {} has 0 dimension: {}x{}",
+                        glyph_id,
+                        bitmap.width(),
+                        bitmap.height()
+                    );
+                    return Ok(());
                 }
-                (_, GlyphBitmapData::Format8 { components, .. })
-                | (_, GlyphBitmapData::Format9 { components, .. }) => {
-                    let ids = components
-                        .iter()
-                        .map(|component| component.glyph_id.to_string())
-                        .collect::<Vec<_>>();
-                    println!("glyph {} is comprised of {}", glyph_id, ids.join(", "))
-                }
-                (_, bitmap) => {
-                    // Convert to PNG and write out
-                    if bitmap.width() == 0 || bitmap.height() == 0 {
-                        println!(
-                            "glyph {} has 0 dimension: {}x{}",
-                            glyph_id,
-                            bitmap.width(),
-                            bitmap.height()
-                        );
-                        continue;
-                    }
-                    let file = File::create(&glyph_path)?;
-                    let w = BufWriter::new(file);
-                    let mut encoder =
-                        png::Encoder::new(w, u32::from(bitmap.width()), u32::from(bitmap.height()));
-                    encoder.set_color(if strike.bit_depth != BitDepth::ThirtyTwo {
-                        png::ColorType::Grayscale
-                    } else {
-                        png::ColorType::RGBA
-                    });
-                    let bit_depth = match strike.bit_depth {
-                        BitDepth::One => png::BitDepth::One,
-                        BitDepth::Two => png::BitDepth::Two,
-                        BitDepth::Four => png::BitDepth::Four,
-                        BitDepth::Eight | BitDepth::ThirtyTwo => png::BitDepth::Eight,
-                    };
-                    encoder.set_depth(bit_depth);
-                    let mut writer = encoder.write_header()?;
-                    write_image_data(&strike, &bitmap, &mut writer)?;
-                }
+                let file = File::create(&glyph_path)?;
+                let w = BufWriter::new(file);
+                let mut encoder =
+                    png::Encoder::new(w, u32::from(bitmap.width()), u32::from(bitmap.height()));
+                encoder.set_color(if strike.bit_depth() != BitDepth::ThirtyTwo {
+                    png::ColorType::Grayscale
+                } else {
+                    png::ColorType::RGBA
+                });
+                let bit_depth = match strike.bit_depth() {
+                    BitDepth::One => png::BitDepth::One,
+                    BitDepth::Two => png::BitDepth::Two,
+                    BitDepth::Four => png::BitDepth::Four,
+                    BitDepth::Eight | BitDepth::ThirtyTwo => png::BitDepth::Eight,
+                };
+                encoder.set_depth(bit_depth);
+                let mut writer = encoder.write_header()?;
+                write_image_data(&strike, &bitmap, &mut writer)?;
             }
         }
     }
@@ -118,7 +121,7 @@ fn dump_bitmaps<'a>(
 }
 
 fn write_image_data(
-    strike: &BitmapSize,
+    strike: &MatchingStrike,
     bitmap: &GlyphBitmapData,
     writer: &mut png::Writer<BufWriter<File>>,
 ) -> Result<(), BoxError> {
@@ -133,7 +136,7 @@ fn write_image_data(
             data,
         } => {
             let image_data = unpack_bit_aligned_data(
-                strike.bit_depth,
+                strike.bit_depth(),
                 small_metrics.width,
                 small_metrics.height,
                 data,
@@ -143,7 +146,7 @@ fn write_image_data(
         // Format 5: metrics in EBLC, bit-aligned image data only.
         GlyphBitmapData::Format5 { big_metrics, data } => {
             let image_data = unpack_bit_aligned_data(
-                strike.bit_depth,
+                strike.bit_depth(),
                 big_metrics.width,
                 big_metrics.height,
                 data,
@@ -155,7 +158,7 @@ fn write_image_data(
         // Format7: big metrics, bit-aligned data.
         GlyphBitmapData::Format7 { data, big_metrics } => {
             let image_data = unpack_bit_aligned_data(
-                strike.bit_depth,
+                strike.bit_depth(),
                 big_metrics.width,
                 big_metrics.height,
                 data,
