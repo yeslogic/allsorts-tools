@@ -11,6 +11,7 @@ use allsorts::fontfile::FontFile;
 use allsorts::gsub::{GlyphOrigin, RawGlyph};
 use allsorts::tables::cmap::Cmap;
 use allsorts::tables::{FontTableProvider, MaxpTable};
+use allsorts::tinyvec::tiny_vec;
 use allsorts::{macroman, subset, tag};
 
 use crate::cli::SubsetOpts;
@@ -61,7 +62,7 @@ fn subset_text<'a, F: FontTableProvider>(
     // Work out the glyphs we want to keep from the text
     let mut glyphs = chars_to_glyphs(font_provider, text)?;
     let notdef = RawGlyph {
-        unicodes: vec![],
+        unicodes: tiny_vec![],
         glyph_index: Some(0),
         liga_component_pos: 0,
         glyph_origin: GlyphOrigin::Direct,
@@ -71,6 +72,7 @@ fn subset_text<'a, F: FontTableProvider>(
         fake_bold: false,
         fake_italic: false,
         extra_data: (),
+        variation: None,
     };
     glyphs.insert(0, Some(notdef));
 
@@ -124,12 +126,12 @@ fn chars_to_glyphs<'a, F: FontTableProvider>(
 ) -> Result<Vec<Option<RawGlyph<()>>>, BoxError> {
     let cmap_data = font_provider.read_table_data(tag::CMAP)?;
     let cmap = ReadScope::new(&cmap_data).read::<Cmap>()?;
-    let cmap_subtable =
+    let (_, cmap_subtable) =
         read_cmap_subtable(&cmap)?.ok_or(ErrorMessage("no suitable cmap sub-table found"))?;
 
     let glyphs = text
         .chars()
-        .map(|ch| glyph::map(&cmap_subtable, ch))
+        .map(|ch| glyph::map(&cmap_subtable, ch, None))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(glyphs)

@@ -4,11 +4,12 @@ use allsorts::binary::read::ReadScope;
 use allsorts::error::ShapingError;
 use allsorts::font_data_impl::read_cmap_subtable;
 use allsorts::gpos::{gpos_apply, Info};
-use allsorts::gsub::{gsub_apply_default, RawGlyph};
+use allsorts::gsub::{gsub_apply_default, GsubFeatureMask, RawGlyph};
 use allsorts::layout::{new_layout_cache, GDEFTable, LayoutTable, GPOS, GSUB};
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::{MaxpTable, OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
 use allsorts::tag;
+use allsorts::unicode::VariationSelector;
 
 use crate::cli::ShapeOpts;
 use crate::glyph;
@@ -56,7 +57,7 @@ fn shape_ttf<'a>(
         println!("no cmap table");
         return Ok(());
     };
-    let cmap_subtable = if let Some(cmap_subtable) = read_cmap_subtable(&cmap)? {
+    let (_, cmap_subtable) = if let Some(cmap_subtable) = read_cmap_subtable(&cmap)? {
         cmap_subtable
     } else {
         println!("no suitable cmap subtable");
@@ -68,11 +69,20 @@ fn shape_ttf<'a>(
         println!("no maxp table");
         return Ok(());
     };
-    let opt_glyphs_res: Result<Vec<_>, _> = text
-        .chars()
-        .map(|ch| glyph::map(&cmap_subtable, ch))
-        .collect();
-    let opt_glyphs = opt_glyphs_res?;
+    let mut chars_iter = text.chars().peekable();
+    let mut opt_glyphs = Vec::new();
+    while let Some(ch) = chars_iter.next() {
+        match VariationSelector::try_from(ch) {
+            Ok(_) => {} // filter out variation selectors
+            Err(()) => {
+                let vs = chars_iter
+                    .peek()
+                    .and_then(|&next| VariationSelector::try_from(next).ok());
+                let glyph = glyph::map(&cmap_subtable, ch, vs)?;
+                opt_glyphs.push(glyph);
+            }
+        }
+    }
     let mut glyphs = opt_glyphs.into_iter().flatten().collect();
     println!("glyphs before: {:#?}", glyphs);
     if let Some(gsub_record) = ttf.find_table_record(tag::GSUB) {
@@ -90,14 +100,13 @@ fn shape_ttf<'a>(
             }
             None => None,
         };
-        let vertical = false;
         gsub_apply_default(
             &|| make_dotted_circle(&cmap_subtable),
             &gsub_cache,
             opt_gdef_table.as_ref(),
             script,
             lang,
-            vertical,
+            GsubFeatureMask::default(),
             maxp.num_glyphs,
             &mut glyphs,
         )?;
@@ -124,7 +133,7 @@ fn shape_ttf<'a>(
 }
 
 fn make_dotted_circle(cmap_subtable: &CmapSubtable) -> Vec<RawGlyph<()>> {
-    match glyph::map(cmap_subtable, '\u{25cc}') {
+    match glyph::map(cmap_subtable, '\u{25cc}', None) {
         Ok(Some(raw_glyph)) => vec![raw_glyph],
         _ => Vec::new(),
     }
