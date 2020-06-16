@@ -67,8 +67,14 @@ pub struct DumpOpts {
     )]
     pub index: usize,
 
+    #[options(help = "include CMAP encodings in output", no_short)]
+    pub encodings: bool,
+
     #[options(help = "dump the specified glyph", meta = "GLYPH_ID")]
     pub glyph: Option<u16>,
+
+    #[options(help = "include glyph names in output", no_short)]
+    pub glyph_names: bool,
 
     #[options(help = "print the hmtx table")]
     pub hmtx: bool,

@@ -1,10 +1,18 @@
+use std::borrow::Borrow;
+use std::convert::{self, TryFrom};
+use std::io::{self, Write};
+use std::str;
+
 use atty::Stream;
 use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 
 use allsorts::binary::read::ReadScope;
 use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
 use allsorts::error::ParseError;
+use allsorts::font_data_impl::read_cmap_subtable;
 use allsorts::fontfile::FontFile;
+use allsorts::glyph_info::GlyphNames;
+use allsorts::tables::cmap::{Cmap, CmapSubtable, EncodingId, PlatformId};
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::{
@@ -15,17 +23,19 @@ use allsorts::tag::{self, DisplayTag};
 use allsorts::woff::WoffFile;
 use allsorts::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
 
-use std::borrow::Borrow;
-use std::convert::TryFrom;
-use std::io::{self, Write};
-use std::str;
-
 use crate::cli::DumpOpts;
 use crate::{BoxError, ErrorMessage};
 
 type Tag = u32;
 
+#[derive(Copy, Clone)]
+struct Flags {
+    encodings: bool,
+    glyphs_names: bool,
+}
+
 pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
+    let flags = Flags::from(&opts);
     let table = opts
         .table
         .map(|table| tag::from_string(&table))
@@ -50,8 +60,12 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
     } else {
         match &font_file {
             FontFile::OpenType(font_file) => match &font_file.font {
-                OpenTypeFont::Single(ttf) => dump_ttf(&font_file.scope, ttf, table)?,
-                OpenTypeFont::Collection(ttc) => dump_ttc(&font_file.scope, ttc, table)?,
+                OpenTypeFont::Single(ttf) => {
+                    dump_ttf(&table_provider, &font_file.scope, ttf, table, flags)?
+                }
+                OpenTypeFont::Collection(ttc) => {
+                    dump_ttc(&table_provider, &font_file.scope, ttc, table, flags)?
+                }
             },
             FontFile::Woff(woff_file) => dump_woff(woff_file, table)?,
             FontFile::Woff2(woff_file) => dump_woff2(
@@ -67,9 +81,11 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
 }
 
 fn dump_ttc<'a>(
+    provider: &impl FontTableProvider,
     scope: &ReadScope<'a>,
     ttc: &TTCHeader<'a>,
     tag: Option<Tag>,
+    flags: Flags,
 ) -> Result<(), BoxError> {
     println!("TTC");
     println!(" - version: {}.{}", ttc.major_version, ttc.minor_version);
@@ -78,16 +94,18 @@ fn dump_ttc<'a>(
     for offset_table_offset in &ttc.offset_tables {
         let offset_table_offset = usize::try_from(offset_table_offset).map_err(ParseError::from)?;
         let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
-        dump_ttf(&scope, &offset_table, tag)?;
+        dump_ttf(provider, &scope, &offset_table, tag, flags)?;
     }
     println!();
     Ok(())
 }
 
 fn dump_ttf<'a>(
+    provider: &impl FontTableProvider,
     scope: &ReadScope<'a>,
     ttf: &OffsetTable<'a>,
     tag: Option<Tag>,
+    flags: Flags,
 ) -> Result<(), BoxError> {
     if let Some(tag) = tag {
         return dump_raw_table(ttf.read_table(&scope, tag)?);
@@ -120,6 +138,13 @@ fn dump_ttf<'a>(
     if let Some(name_table_data) = ttf.read_table(&scope, tag::NAME)? {
         let name_table = name_table_data.read::<NameTable>()?;
         dump_name_table(&name_table)?;
+    }
+    if flags.encodings {
+        print_cmap_encodings(provider)?;
+    }
+    if flags.glyphs_names {
+        println!();
+        print_glyph_names(provider)?;
     }
     Ok(())
 }
@@ -502,5 +527,76 @@ fn get_name_meaning(name_id: u16) -> Option<&'static str> {
         24 => Some("Dark Background Palette"),
         25 => Some("Variations PostScript Name Prefix"),
         _ => None,
+    }
+}
+
+fn print_glyph_names(provider: &impl FontTableProvider) -> Result<(), ParseError> {
+    let table = provider.table_data(tag::MAXP)?.expect("no maxp table");
+    let scope = ReadScope::new(table.borrow());
+    let maxp = scope.read::<MaxpTable>()?;
+
+    let post_data = provider
+        .table_data(tag::POST)
+        .ok()
+        .and_then(convert::identity)
+        .map(|data| Box::from(data.into_owned()));
+
+    let table = provider.table_data(tag::CMAP)?;
+    let scope = table.as_ref().map(|data| ReadScope::new(data.borrow()));
+    let cmap = scope.map(|scope| scope.read::<Cmap<'_>>()).transpose()?;
+
+    let cmap_subtable = cmap
+        .as_ref()
+        .and_then(|cmap| read_cmap_subtable(&cmap).ok())
+        .and_then(convert::identity);
+
+    let names = GlyphNames::new(&cmap_subtable, post_data);
+    for glyph_id in 0..maxp.num_glyphs {
+        let name = names.glyph_name(glyph_id);
+        println!("{}: {}", glyph_id, name);
+    }
+
+    Ok(())
+}
+
+fn print_cmap_encodings(provider: &impl FontTableProvider) -> Result<(), ParseError> {
+    let table = provider.table_data(tag::CMAP)?.expect("no cmap table");
+    let scope = ReadScope::new(table.borrow());
+    let cmap = scope.read::<Cmap<'_>>()?;
+
+    println!("cmap encodings:");
+    for record in cmap.encoding_records() {
+        print!(
+            " - {:?} {:?} ",
+            PlatformId(record.platform_id),
+            EncodingId(record.encoding_id)
+        );
+        if let Ok(subtable) = cmap
+            .scope
+            .offset(usize::try_from(record.offset)?)
+            .read::<CmapSubtable<'_>>()
+        {
+            match subtable {
+                CmapSubtable::Format0 { .. } => println!("Sub-table format 0"),
+                CmapSubtable::Format2 { .. } => println!("Sub-table format 2"),
+                CmapSubtable::Format4 { .. } => println!("Sub-table format 4"),
+                CmapSubtable::Format6 { .. } => println!("Sub-table format 6"),
+                CmapSubtable::Format10 { .. } => println!("Sub-table format 10"),
+                CmapSubtable::Format12 { .. } => println!("Sub-table format 12"),
+            }
+        } else {
+            println!("Unable to read sub-table.");
+        }
+    }
+
+    Ok(())
+}
+
+impl From<&DumpOpts> for Flags {
+    fn from(opts: &DumpOpts) -> Self {
+        Flags {
+            encodings: opts.encodings,
+            glyphs_names: opts.glyph_names,
+        }
     }
 }
