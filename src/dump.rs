@@ -45,6 +45,12 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
     }
 
     let buffer = std::fs::read(&opts.font)?;
+
+    if opts.cff {
+        dump_cff_table(ReadScope::new(&buffer))?;
+        return Ok(0);
+    }
+
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontFile>()?;
     let table_provider = font_file.table_provider(opts.index)?;
@@ -57,8 +63,6 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
         dump_hmtx_table(&table_provider)?;
     } else if let Some(glyph_id) = opts.glyph {
         dump_glyph(&table_provider, glyph_id)?;
-    } else if opts.cff {
-        dump_cff_table(ReadScope::new(&buffer))?
     } else {
         match &font_file {
             FontFile::OpenType(font_file) => match &font_file.font {
