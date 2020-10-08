@@ -1,6 +1,6 @@
 [package]
 name = "allsorts-tools"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["YesLogic Pty. Ltd. <info@yeslogic.com>"]
 edition = "2018"
 publish = false
