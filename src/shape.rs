@@ -1,13 +1,13 @@
 use std::convert::TryFrom;
+use std::rc::Rc;
 
 use allsorts::binary::read::ReadScope;
 use allsorts::error::ShapingError;
-use allsorts::font_data_impl::read_cmap_subtable;
+use allsorts::font_data_impl::FontDataImpl;
+use allsorts::fontfile::FontFile;
 use allsorts::gpos::{gpos_apply, Info};
 use allsorts::gsub::{gsub_apply_default, GsubFeatureMask, RawGlyph};
-use allsorts::layout::{new_layout_cache, GDEFTable, LayoutTable, GPOS, GSUB};
-use allsorts::tables::cmap::{Cmap, CmapSubtable};
-use allsorts::tables::{MaxpTable, OffsetTable, OpenTypeFile, OpenTypeFont, TTCHeader};
+use allsorts::tables::FontTableProvider;
 use allsorts::tag;
 use allsorts::unicode::VariationSelector;
 
@@ -15,62 +15,45 @@ use crate::cli::ShapeOpts;
 use crate::glyph;
 use crate::BoxError;
 
+const DOTTED_CIRCLE: char = '\u{25cc}';
+
 pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
     let script = tag::from_string(&opts.script)?;
     let lang = tag::from_string(&opts.lang)?;
     let buffer = std::fs::read(&opts.font)?;
-    let fontfile = ReadScope::new(&buffer).read::<OpenTypeFile>()?;
+    let scope = ReadScope::new(&buffer);
+    let font_file = scope.read::<FontFile<'_>>()?;
+    let provider = font_file.table_provider(opts.index)?;
+    let font_data_impl = match FontDataImpl::new(Box::new(provider))? {
+        Some(font_data_impl) => font_data_impl,
+        None => {
+            eprintln!("unable to find suitable cmap subtable");
+            return Ok(1);
+        }
+    };
 
-    match fontfile.font {
-        OpenTypeFont::Single(ttf) => shape_ttf(&fontfile.scope, ttf, script, lang, &opts.text)?,
-        OpenTypeFont::Collection(ttc) => shape_ttc(&fontfile.scope, ttc, script, lang, &opts.text)?,
-    }
-
+    shape(font_data_impl, script, lang, &opts.text)?;
     Ok(0)
 }
 
-fn shape_ttc<'a>(
-    scope: &ReadScope<'a>,
-    ttc: TTCHeader<'a>,
+fn shape<'a, P: FontTableProvider>(
+    mut font: FontDataImpl<P>,
     script: u32,
     lang: u32,
     text: &str,
 ) -> Result<(), ShapingError> {
-    for offset_table_offset in &ttc.offset_tables {
-        let offset_table_offset = usize::try_from(offset_table_offset)?;
-        let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
-        shape_ttf(scope, offset_table, script, lang, text)?;
-    }
-    Ok(())
-}
+    let opt_gsub_cache = font.gsub_cache()?;
+    let opt_gpos_cache = font.gpos_cache()?;
+    let opt_gdef_table = font.gdef_table()?;
+    let opt_gdef_table = opt_gdef_table.as_ref().map(Rc::as_ref);
 
-fn shape_ttf<'a>(
-    scope: &ReadScope<'a>,
-    ttf: OffsetTable<'a>,
-    script: u32,
-    lang: u32,
-    text: &str,
-) -> Result<(), ShapingError> {
-    let cmap = if let Some(cmap_scope) = ttf.read_table(&scope, tag::CMAP)? {
-        cmap_scope.read::<Cmap>()?
-    } else {
-        println!("no cmap table");
-        return Ok(());
-    };
-    let (_, cmap_subtable) = if let Some(cmap_subtable) = read_cmap_subtable(&cmap)? {
-        cmap_subtable
-    } else {
-        println!("no suitable cmap subtable");
-        return Ok(());
-    };
-    let maxp = if let Some(maxp_scope) = ttf.read_table(&scope, tag::MAXP)? {
-        maxp_scope.read::<MaxpTable>()?
-    } else {
-        println!("no maxp table");
-        return Ok(());
-    };
+    // Map glyphs
+    //
+    // We look ahead in the char stream for variation selectors. If one is found it is used for
+    // mapping the current glyph. When a variation selector is reached in the stream it is skipped
+    // as it was handled as part of the preceding character.
     let mut chars_iter = text.chars().peekable();
-    let mut opt_glyphs = Vec::new();
+    let mut glyphs = Vec::new();
     while let Some(ch) = chars_iter.next() {
         match VariationSelector::try_from(ch) {
             Ok(_) => {} // filter out variation selectors
@@ -78,63 +61,50 @@ fn shape_ttf<'a>(
                 let vs = chars_iter
                     .peek()
                     .and_then(|&next| VariationSelector::try_from(next).ok());
-                let glyph = glyph::map(&cmap_subtable, ch, vs)?;
-                opt_glyphs.push(glyph);
+                // TODO: Remove cast when lookup_glyph_index returns u16
+                let glyph_index = font.lookup_glyph_index(ch as u32) as u16;
+                let glyph = glyph::make(ch, glyph_index, vs);
+                glyphs.push(glyph);
             }
         }
     }
-    let mut glyphs = opt_glyphs.into_iter().flatten().collect();
+
+    // Apply gsub if table is present
     println!("glyphs before: {:#?}", glyphs);
-    if let Some(gsub_record) = ttf.find_table_record(tag::GSUB) {
-        let gsub_table = gsub_record.read_table(scope)?.read::<LayoutTable<GSUB>>()?;
-        let gsub_cache = new_layout_cache::<GSUB>(gsub_table);
-        let opt_gdef_table = match ttf.find_table_record(tag::GDEF) {
-            Some(gdef_record) => Some(gdef_record.read_table(scope)?.read::<GDEFTable>()?),
-            None => None,
-        };
-        let opt_gpos_cache = match ttf.find_table_record(tag::GPOS) {
-            Some(gpos_record) => {
-                let gpos_table = gpos_record.read_table(scope)?.read::<LayoutTable<GPOS>>()?;
-                let gpos_cache = new_layout_cache::<GPOS>(gpos_table);
-                Some(gpos_cache)
-            }
-            None => None,
-        };
+    if let Some(gsub_cache) = opt_gsub_cache {
         gsub_apply_default(
-            &|| make_dotted_circle(&cmap_subtable),
+            &|| make_dotted_circle(&font),
             &gsub_cache,
-            opt_gdef_table.as_ref(),
+            opt_gdef_table,
             script,
             lang,
             GsubFeatureMask::default(),
-            maxp.num_glyphs,
+            font.num_glyphs(),
             &mut glyphs,
         )?;
         println!("glyphs after: {:#?}", glyphs);
-        match opt_gpos_cache {
-            Some(gpos_cache) => {
-                let kerning = true;
-                let mut infos = Info::init_from_glyphs(opt_gdef_table.as_ref(), glyphs)?;
-                gpos_apply(
-                    &gpos_cache,
-                    opt_gdef_table.as_ref(),
-                    kerning,
-                    script,
-                    lang,
-                    &mut infos,
-                )?;
-            }
-            None => {}
+
+        // Apply gpos if table is present
+        if let Some(gpos_cache) = opt_gpos_cache {
+            let kerning = true;
+            let mut infos = Info::init_from_glyphs(opt_gdef_table, glyphs)?;
+            gpos_apply(
+                &gpos_cache,
+                opt_gdef_table,
+                kerning,
+                script,
+                lang,
+                &mut infos,
+            )?;
         }
     } else {
-        println!("no GSUB table");
+        eprintln!("no GSUB table");
     }
     Ok(())
 }
 
-fn make_dotted_circle(cmap_subtable: &CmapSubtable) -> Vec<RawGlyph<()>> {
-    match glyph::map(cmap_subtable, '\u{25cc}', None) {
-        Ok(Some(raw_glyph)) => vec![raw_glyph],
-        _ => Vec::new(),
-    }
+fn make_dotted_circle<P: FontTableProvider>(font_data_impl: &FontDataImpl<P>) -> Vec<RawGlyph<()>> {
+    // TODO: Remove cast when lookup_glyph_index returns u16
+    let glyph_index = font_data_impl.lookup_glyph_index(DOTTED_CIRCLE as u32) as u16;
+    vec![glyph::make(DOTTED_CIRCLE, glyph_index, None)]
 }
