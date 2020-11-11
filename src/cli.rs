@@ -154,6 +154,13 @@ pub struct ShapeOpts {
     #[options(required, help = "path to font file", meta = "PATH")]
     pub font: String,
 
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
     #[options(required, help = "script to shape", meta = "SCRIPT")]
     pub script: String,
 
