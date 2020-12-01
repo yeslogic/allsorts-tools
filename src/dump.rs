@@ -9,19 +9,19 @@ use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 use allsorts::binary::read::ReadScope;
 use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
 use allsorts::error::ParseError;
-use allsorts::font_data_impl::read_cmap_subtable;
-use allsorts::fontfile::FontFile;
+use allsorts::font::read_cmap_subtable;
+use allsorts::font_data::FontData;
 use allsorts::glyph_info::GlyphNames;
 use allsorts::tables::cmap::{Cmap, CmapSubtable, EncodingId, PlatformId};
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::{
     FontTableProvider, HeadTable, HheaTable, HmtxTable, MaxpTable, NameTable, OffsetTable,
-    OpenTypeFont, TTCHeader,
+    OpenTypeData, TTCHeader,
 };
 use allsorts::tag::{self, DisplayTag};
-use allsorts::woff::WoffFile;
-use allsorts::woff2::{Woff2File, Woff2GlyfTable, Woff2LocaTable};
+use allsorts::woff::WoffFont;
+use allsorts::woff2::{Woff2Font, Woff2GlyfTable, Woff2LocaTable};
 
 use crate::cli::DumpOpts;
 use crate::{BoxError, ErrorMessage};
@@ -52,7 +52,7 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
     }
 
     let scope = ReadScope::new(&buffer);
-    let font_file = scope.read::<FontFile>()?;
+    let font_file = scope.read::<FontData>()?;
     let table_provider = font_file.table_provider(opts.index)?;
 
     if opts.loca {
@@ -65,16 +65,16 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
         dump_glyph(&table_provider, glyph_id)?;
     } else {
         match &font_file {
-            FontFile::OpenType(font_file) => match &font_file.font {
-                OpenTypeFont::Single(ttf) => {
+            FontData::OpenType(font_file) => match &font_file.data {
+                OpenTypeData::Single(ttf) => {
                     dump_ttf(&table_provider, &font_file.scope, ttf, table, flags)?
                 }
-                OpenTypeFont::Collection(ttc) => {
+                OpenTypeData::Collection(ttc) => {
                     dump_ttc(&table_provider, &font_file.scope, ttc, table, flags)?
                 }
             },
-            FontFile::Woff(woff_file) => dump_woff(woff_file, table)?,
-            FontFile::Woff2(woff_file) => dump_woff2(
+            FontData::Woff(woff_file) => dump_woff(woff_file, table)?,
+            FontData::Woff2(woff_file) => dump_woff2(
                 woff_file.table_data_block_scope(),
                 &woff_file,
                 table,
@@ -155,7 +155,7 @@ fn dump_ttf<'a>(
     Ok(())
 }
 
-fn dump_woff<'a>(woff: &WoffFile<'a>, tag: Option<Tag>) -> Result<(), BoxError> {
+fn dump_woff<'a>(woff: &WoffFont<'a>, tag: Option<Tag>) -> Result<(), BoxError> {
     let scope = &woff.scope;
     if let Some(tag) = tag {
         if let Some(entry) = woff.table_directory.iter().find(|entry| entry.tag == tag) {
@@ -204,7 +204,7 @@ fn dump_woff<'a>(woff: &WoffFile<'a>, tag: Option<Tag>) -> Result<(), BoxError> 
 
 fn dump_woff2<'a>(
     scope: ReadScope<'a>,
-    woff: &Woff2File<'a>,
+    woff: &Woff2Font<'a>,
     tag: Option<Tag>,
     index: usize,
 ) -> Result<(), BoxError> {
@@ -551,7 +551,7 @@ fn print_glyph_names(provider: &impl FontTableProvider) -> Result<(), ParseError
         .table_data(tag::POST)
         .ok()
         .and_then(convert::identity)
-        .map(|data| Box::from(data.into_owned()));
+        .map(|data| Box::from(&*data));
 
     let table = provider.table_data(tag::CMAP)?;
     let scope = table.as_ref().map(|data| ReadScope::new(data.borrow()));

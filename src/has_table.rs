@@ -1,6 +1,6 @@
 use allsorts::binary::read::ReadScope;
 
-use allsorts::fontfile::FontFile;
+use allsorts::font_data::FontData;
 
 use allsorts::tables::FontTableProvider;
 use allsorts::tag::{self};
@@ -12,7 +12,7 @@ pub fn main(opts: HasTableOpts) -> Result<i32, BoxError> {
     let table = tag::from_string(&opts.table)?;
     let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
-    let font_file = scope.read::<FontFile>()?;
+    let font_file = scope.read::<FontData>()?;
     let table_provider = font_file.table_provider(opts.index)?;
     if table_provider.has_table(table) {
         if opts.print_file {

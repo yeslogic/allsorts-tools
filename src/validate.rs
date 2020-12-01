@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 
 use allsorts::binary::read::ReadScope;
 use allsorts::error::ParseError;
-use allsorts::fontfile::FontFile;
+use allsorts::font_data::FontData;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::{FontTableProvider, HeadTable, MaxpTable};
@@ -15,7 +15,7 @@ use std::convert::TryFrom;
 pub fn main(opts: ValidateOpts) -> Result<i32, BoxError> {
     let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
-    let font_file = scope.read::<FontFile>()?;
+    let font_file = scope.read::<FontData>()?;
     let table_provider = font_file.table_provider(0)?; // TODO: Handle all fonts in collection
     let failed = dump_glyphs(&opts.font, &table_provider)?;
     if failed {
