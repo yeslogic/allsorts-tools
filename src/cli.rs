@@ -11,7 +11,7 @@ pub struct Cli {
 
 #[derive(Debug, Options)]
 pub enum Command {
-    #[options(help = "dump all bitmaps in EBDT/CBDT tables")]
+    #[options(help = "dump bitmaps for supplied text")]
     Bitmaps(BitmapOpts),
 
     #[options(help = "dump font information")]
@@ -35,6 +35,9 @@ pub struct BitmapOpts {
     #[options(help = "print help message")]
     pub help: bool,
 
+    #[options(required, help = "path to font file", meta = "PATH")]
+    pub font: String,
+
     #[options(
         help = "index of the font to dump (for TTC, WOFF2)",
         meta = "INDEX",
@@ -45,8 +48,11 @@ pub struct BitmapOpts {
     #[options(required, help = "path to directory to write to")]
     pub output: String,
 
-    #[options(free, required, help = "path to font to dump")]
-    pub font: String,
+    #[options(required, help = "font size to find bitmaps for")]
+    pub size: u16,
+
+    #[options(free, required, help = "text to extract bitmaps for")]
+    pub text: String,
 }
 
 #[derive(Debug, Options)]

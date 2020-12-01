@@ -6,8 +6,8 @@ use std::str;
 use itertools::Itertools;
 
 use allsorts::binary::read::ReadScope;
-use allsorts::font_data_impl::read_cmap_subtable;
-use allsorts::fontfile::FontFile;
+use allsorts::font::read_cmap_subtable;
+use allsorts::font_data::FontData;
 use allsorts::gsub::{GlyphOrigin, RawGlyph};
 use allsorts::tables::cmap::Cmap;
 use allsorts::tables::{FontTableProvider, MaxpTable};
@@ -19,7 +19,7 @@ use crate::{glyph, BoxError, ErrorMessage};
 
 pub fn main(opts: SubsetOpts) -> Result<i32, BoxError> {
     let buffer = std::fs::read(&opts.input)?;
-    let font_file = ReadScope::new(&buffer).read::<FontFile>()?;
+    let font_file = ReadScope::new(&buffer).read::<FontData>()?;
     let provider = font_file.table_provider(opts.index)?;
 
     if opts.text.is_none() && !opts.all {
@@ -63,7 +63,7 @@ fn subset_text<'a, F: FontTableProvider>(
     let mut glyphs = chars_to_glyphs(font_provider, text)?;
     let notdef = RawGlyph {
         unicodes: tiny_vec![],
-        glyph_index: Some(0),
+        glyph_index: 0,
         liga_component_pos: 0,
         glyph_origin: GlyphOrigin::Direct,
         small_caps: false,
@@ -80,7 +80,7 @@ fn subset_text<'a, F: FontTableProvider>(
     glyphs.sort_by(|a, b| a.glyph_index.cmp(&b.glyph_index));
     let glyph_ids = glyphs
         .iter()
-        .flat_map(|glyph| glyph.glyph_index)
+        .map(|glyph| glyph.glyph_index)
         .dedup()
         .collect_vec();
     if glyph_ids.is_empty() {
