@@ -55,7 +55,6 @@ dependencies = [
  "atty",
  "encoding_rs",
  "gumdrop",
- "itertools",
  "png",
 ]
 
