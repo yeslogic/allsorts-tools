@@ -13,7 +13,6 @@ path = "src/main.rs"
 atty = "0.2.13"
 encoding_rs = "0.8.16"
 gumdrop = "0.7.0"
-itertools = "0.8.0"
 png = "0.15.3"
 
 [dependencies.allsorts]

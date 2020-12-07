@@ -3,8 +3,6 @@ use std::fs::File;
 use std::io::Write;
 use std::str;
 
-use itertools::Itertools;
-
 use allsorts::binary::read::ReadScope;
 use allsorts::font::read_cmap_subtable;
 use allsorts::font_data::FontData;
@@ -44,7 +42,7 @@ fn subset_all<'a, F: FontTableProvider>(
     let scope = ReadScope::new(table.borrow());
     let maxp = scope.read::<MaxpTable>()?;
 
-    let glyph_ids = (0..maxp.num_glyphs).collect_vec();
+    let glyph_ids = (0..maxp.num_glyphs).collect::<Vec<_>>();
     let new_font = subset::subset(font_provider, &glyph_ids, None)?;
 
     // Write out the new font
@@ -78,11 +76,11 @@ fn subset_text<'a, F: FontTableProvider>(
 
     let mut glyphs: Vec<RawGlyph<()>> = glyphs.into_iter().flatten().collect();
     glyphs.sort_by(|a, b| a.glyph_index.cmp(&b.glyph_index));
-    let glyph_ids = glyphs
+    let mut glyph_ids = glyphs
         .iter()
         .map(|glyph| glyph.glyph_index)
-        .dedup()
-        .collect_vec();
+        .collect::<Vec<_>>();
+    glyph_ids.dedup();
     if glyph_ids.is_empty() {
         return Err(ErrorMessage("no glyphs left in font").into());
     }
