@@ -5,6 +5,7 @@ mod glyph;
 pub mod has_table;
 pub mod shape;
 pub mod subset;
+pub mod svg;
 mod unicode;
 pub mod validate;
 
