@@ -175,4 +175,7 @@ pub struct ShapeOpts {
 
     #[options(free, required, help = "text to shape")]
     pub text: String,
+
+    #[options(help = "vertical layout, default horizontal", no_short)]
+    pub vertical: bool,
 }
