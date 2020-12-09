@@ -5,6 +5,7 @@ mod glyph;
 pub mod has_table;
 pub mod shape;
 pub mod subset;
+mod unicode;
 pub mod validate;
 
 use std::error::Error;
