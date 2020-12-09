@@ -28,6 +28,9 @@ pub enum Command {
 
     #[options(help = "apply shaping to glyphs from a font")]
     Shape(ShapeOpts),
+
+    #[options(help = "output an SVG rendition of the supplied text")]
+    Svg(SvgOpts),
 }
 
 #[derive(Debug, Options)]
@@ -178,4 +181,20 @@ pub struct ShapeOpts {
 
     #[options(help = "vertical layout, default horizontal", no_short)]
     pub vertical: bool,
+}
+
+#[derive(Debug, Options)]
+#[options(help = "Output an SVG in the format expected by the unicode text-rendering tests")]
+pub struct SvgOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(required, help = "path to font file", meta = "PATH")]
+    pub font: String,
+
+    #[options(required, help = "name of test case", meta = "NAME")]
+    pub testcase: String,
+
+    #[options(required, help = "text to render", meta = "TEXT")]
+    pub render: String,
 }
