@@ -189,6 +189,12 @@ pub struct SvgOpts {
     #[options(help = "print help message")]
     pub help: bool,
 
+    #[options(
+        help = "ignored, compatibility with text-rendering-tests",
+        meta = "ENGINE"
+    )]
+    pub engine: String,
+
     #[options(required, help = "path to font file", meta = "PATH")]
     pub font: String,
 
