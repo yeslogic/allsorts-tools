@@ -12,7 +12,7 @@ pub mod validate;
 use std::error::Error;
 use std::fmt;
 
-type BoxError = Box<dyn Error>;
+pub type BoxError = Box<dyn Error>;
 
 #[derive(Debug)]
 struct ErrorMessage(pub &'static str);
