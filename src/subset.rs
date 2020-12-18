@@ -34,10 +34,7 @@ pub fn main(opts: SubsetOpts) -> Result<i32, BoxError> {
     Ok(0)
 }
 
-fn subset_all<'a, F: FontTableProvider>(
-    font_provider: &F,
-    output_path: &str,
-) -> Result<(), BoxError> {
+fn subset_all<F: FontTableProvider>(font_provider: &F, output_path: &str) -> Result<(), BoxError> {
     let table = font_provider.table_data(tag::MAXP)?.expect("no maxp table");
     let scope = ReadScope::new(table.borrow());
     let maxp = scope.read::<MaxpTable>()?;
@@ -52,7 +49,7 @@ fn subset_all<'a, F: FontTableProvider>(
     Ok(())
 }
 
-fn subset_text<'a, F: FontTableProvider>(
+fn subset_text<F: FontTableProvider>(
     font_provider: &F,
     text: &str,
     output_path: &str,
@@ -118,7 +115,7 @@ fn subset_text<'a, F: FontTableProvider>(
     Ok(())
 }
 
-fn chars_to_glyphs<'a, F: FontTableProvider>(
+fn chars_to_glyphs<F: FontTableProvider>(
     font_provider: &F,
     text: &str,
 ) -> Result<Vec<Option<RawGlyph<()>>>, BoxError> {
