@@ -56,7 +56,7 @@ pub fn main(opts: BitmapOpts) -> Result<i32, BoxError> {
     Ok(0)
 }
 
-fn dump_bitmap<'a>(path: &Path, glyph_id: u16, bitmap: &BitmapGlyph) -> Result<(), BoxError> {
+fn dump_bitmap(path: &Path, glyph_id: u16, bitmap: &BitmapGlyph) -> Result<(), BoxError> {
     match &bitmap.bitmap {
         Bitmap::Embedded(embedded) => {
             let glyph_path = path.join(&format!("{}.png", glyph_id));
