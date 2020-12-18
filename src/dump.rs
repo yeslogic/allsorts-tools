@@ -155,7 +155,7 @@ fn dump_ttf<'a>(
     Ok(())
 }
 
-fn dump_woff<'a>(woff: &WoffFont<'a>, tag: Option<Tag>) -> Result<(), BoxError> {
+fn dump_woff(woff: &WoffFont<'_>, tag: Option<Tag>) -> Result<(), BoxError> {
     let scope = &woff.scope;
     if let Some(tag) = tag {
         if let Some(entry) = woff.table_directory.iter().find(|entry| entry.tag == tag) {
@@ -210,7 +210,7 @@ fn dump_woff2<'a>(
 ) -> Result<(), BoxError> {
     if let Some(tag) = tag {
         let table = woff.read_table(tag, index)?;
-        return dump_raw_table(table.as_ref().map(|buf| buf.scope().clone()));
+        return dump_raw_table(table.as_ref().map(|buf| buf.scope()));
     }
 
     println!("TTF in WOFF2");
