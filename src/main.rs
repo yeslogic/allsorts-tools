@@ -39,11 +39,11 @@ fn allsorts_main() -> Result<i32, BoxError> {
     }
 }
 
-/// Special code path to confirm to the CLI interface expected by the unicode text rendering tests
+/// Special code path to conform to the CLI interface expected by the unicode text rendering tests
 /// https://github.com/unicode-org/text-rendering-tests
 fn text_rendering_test_main() -> Result<i32, BoxError> {
     if env::args_os().any(|arg| arg == "--version") {
-        println!("Allsorts/{}", env!("CARGO_PKG_VERSION"));
+        println!("Allsorts/{}", allsorts::VERSION);
         Ok(0)
     } else {
         let opts = SvgOpts::parse_args_default_or_exit();
