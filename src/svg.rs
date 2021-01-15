@@ -1,39 +1,76 @@
-use xmlwriter::{XmlWriter, Options};
+mod writer;
+
+use allsorts::binary::read::ReadScope;
+use allsorts::cff::CFF;
+use allsorts::error::ParseError;
+use allsorts::font::{GlyphTableFlags, MatchingPresentation};
+use allsorts::font_data::FontData;
+use allsorts::gsub::{Features, GsubFeatureMask};
+use allsorts::post::PostTable;
+use allsorts::tables::glyf::GlyfTable;
+use allsorts::tables::loca::LocaTable;
+use allsorts::tables::FontTableProvider;
+use allsorts::{tag, Font};
 
 use crate::cli::SvgOpts;
+use crate::svg::writer::SVGWriter;
 use crate::BoxError;
 
 pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
-    let mut w = XmlWriter::new(Options::default());
-    w.write_declaration();
-    w.start_element("svg");
-    w.write_attribute("version", "1.1");
-    w.write_attribute("xmlns", "http://www.w3.org/2000/svg");
-    w.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-    w.write_attribute("viewBox", "0 -120 1446 1200");
+    // Read and parse the font
+    let script = tag::LATN;
+    let lang = tag::from_string("ENG ")?;
+    let buffer = std::fs::read(&opts.font)?;
+    let scope = ReadScope::new(&buffer);
+    let font_file = scope.read::<FontData<'_>>()?;
+    let provider = font_file.table_provider(0)?;
+    let mut font = match Font::new(provider)? {
+        Some(font) => font,
+        None => {
+            eprintln!("unable to find suitable cmap subtable");
+            return Ok(1);
+        }
+    };
 
-    w.start_element("symbol");
-    w.write_attribute("id", "Foo-5/6.uni2269");
-    w.write_attribute("overflow", "visible");
+    // Map text to glyphs and then apply font shaping
+    let glyphs = font.map_glyphs(&opts.render, MatchingPresentation::NotRequired);
+    let infos = font.shape(
+        glyphs,
+        script,
+        Some(lang),
+        &Features::Mask(GsubFeatureMask::default()),
+        true,
+    )?;
 
-    w.start_element("path");
-    w.write_attribute("d", "M100,334 L623,563 L623,619 L100,880 L100,793 L518,594 L100,420 Z M100,208 L622,208 L622,287 L100,287 Z M100,38 L622,38 L622,117 L100,117 Z M282,-93 L508,379 L436,413 L211,-59 Z");
-    w.end_element(); // path
-    w.end_element(); // symbol
+    // TODO: Can we avoid creating a new table provider?
+    let provider = font_file.table_provider(0)?;
+    let post_data = provider.table_data(tag::POST)?;
+    let post = post_data
+        .as_ref()
+        .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
+        .transpose()?;
 
-    w.start_element("use");
-    w.write_attribute("xlink:href", "#Foo-5/6.uni2269");
-    w.write_attribute("x", "0");
-    w.write_attribute("y", "0");
-    w.end_element(); // use
-
-    w.start_element("use");
-    w.write_attribute("xlink:href", "#Foo-5/6.uni2269");
-    w.write_attribute("x", "723");
-    w.write_attribute("y", "0");
-    w.end_element(); // use
-
-    let svg = w.end_document();
+    // Turn each glyph into an SVG...
+    let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF) {
+        let cff_data = provider.read_table_data(tag::CFF)?;
+        let mut cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
+        let writer = SVGWriter::new(opts.testcase, opts.flip);
+        writer.glyphs_to_svg(&mut cff, &mut font, &infos, post.as_ref())?
+    } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
+        let head = font.head_table()?.ok_or(ParseError::MissingValue)?;
+        let loca_data = provider.read_table_data(tag::LOCA)?;
+        let loca = ReadScope::new(&loca_data).read_dep::<LocaTable<'_>>((
+            usize::from(font.maxp_table.num_glyphs),
+            head.index_to_loc_format,
+        ))?;
+        let glyf_data = provider.read_table_data(tag::GLYF)?;
+        let mut glyf = ReadScope::new(&glyf_data).read_dep::<GlyfTable<'_>>(&loca)?;
+        let writer = SVGWriter::new(opts.testcase, opts.flip);
+        writer.glyphs_to_svg(&mut glyf, &mut font, &infos, post.as_ref())?
+    } else {
+        eprintln!("no glyf or CFF table");
+        return Ok(1);
+    };
 
     println!("{}", svg);
 
