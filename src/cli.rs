@@ -203,4 +203,7 @@ pub struct SvgOpts {
 
     #[options(required, help = "text to render", meta = "TEXT")]
     pub render: String,
+
+    #[options(help = "flip output (rotate 180deg)", no_short)]
+    pub flip: bool,
 }
