@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::glyph::calculate_glyph_positions;
 use allsorts::context::Glyph;
 use allsorts::gpos::Info;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
@@ -45,12 +46,18 @@ impl SVGWriter {
     {
         // Turn each glyph into an SVG...
         let mut x = 0.;
-        let y = 0.;
+        let mut y = 0.;
+        let glyph_positions =
+            calculate_glyph_positions(font, infos, false).expect("FIXME calculate_glyph_positions");
+        let glyph_positions_iter = glyph_positions
+            .iter()
+            .copied()
+            .map(|(a, x, y)| (a as f32, x as f32, y as f32));
         let mut symbols = HashMap::new();
-        for info in infos {
+        for (info, (advance, glyph_x, glyph_y)) in infos.iter().zip(glyph_positions_iter) {
             let glyph_index = info.get_glyph_index();
             if let Some(&symbol_index) = symbols.get(&glyph_index) {
-                self.use_glyph(symbol_index, x, y)
+                self.use_glyph(symbol_index, glyph_x, glyph_y)
             } else {
                 let glyph_name = post
                     .as_ref()
@@ -60,10 +67,9 @@ impl SVGWriter {
                 let symbol_index = self.new_glyph(glyph_name);
                 symbols.insert(glyph_index, symbol_index);
                 builder.visit(glyph_index, &mut self)?;
-                self.use_glyph(symbol_index, x, y);
+                self.use_glyph(symbol_index, glyph_x, glyph_y);
             }
-            let advance = font.horizontal_advance(glyph_index).unwrap_or(0);
-            x += f32::from(advance);
+            x += advance;
         }
 
         Ok(self.end(x, font.hhea_table.ascender, font.hhea_table.descender))
