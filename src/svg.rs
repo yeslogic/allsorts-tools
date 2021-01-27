@@ -6,16 +6,16 @@ use allsorts::error::ParseError;
 use allsorts::font::{GlyphTableFlags, MatchingPresentation};
 use allsorts::font_data::FontData;
 use allsorts::gsub::{Features, GsubFeatureMask};
+use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::post::PostTable;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
-use allsorts::tables::FontTableProvider;
+use allsorts::tables::{FontTableProvider, SfntVersion};
 use allsorts::{tag, Font};
 
 use crate::cli::SvgOpts;
 use crate::svg::writer::SVGWriter;
 use crate::BoxError;
-use allsorts::outline::{OutlineBuilder, OutlineSink};
 
 pub trait GlyphName {
     fn gid_to_glyph_name(&self, gid: u16) -> Option<String>;
@@ -55,13 +55,15 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     let provider = font_file.table_provider(0)?;
 
     // Turn each glyph into an SVG...
-    let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF) {
+    let head = font.head_table()?.ok_or(ParseError::MissingValue)?;
+    let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF)
+        && provider.sfnt_version() == tag::OTTO
+    {
         let cff_data = provider.read_table_data(tag::CFF)?;
         let mut cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
-        let writer = SVGWriter::new(opts.testcase, opts.flip);
+        let writer = SVGWriter::new(opts.testcase, opts.flip, scale);
         writer.glyphs_to_svg(&mut cff, &mut font, &infos)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
-        let head = font.head_table()?.ok_or(ParseError::MissingValue)?;
         let loca_data = provider.read_table_data(tag::LOCA)?;
         let loca = ReadScope::new(&loca_data).read_dep::<LocaTable<'_>>((
             usize::from(font.maxp_table.num_glyphs),
