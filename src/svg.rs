@@ -15,6 +15,16 @@ use allsorts::{tag, Font};
 use crate::cli::SvgOpts;
 use crate::svg::writer::SVGWriter;
 use crate::BoxError;
+use allsorts::outline::{OutlineBuilder, OutlineSink};
+
+pub trait GlyphName {
+    fn gid_to_glyph_name(&self, gid: u16) -> Option<String>;
+}
+
+struct GlyfPost<'a> {
+    glyf: GlyfTable<'a>,
+    post: Option<PostTable<'a>>,
+}
 
 pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     // Read and parse the font
@@ -43,18 +53,13 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
 
     // TODO: Can we avoid creating a new table provider?
     let provider = font_file.table_provider(0)?;
-    let post_data = provider.table_data(tag::POST)?;
-    let post = post_data
-        .as_ref()
-        .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
-        .transpose()?;
 
     // Turn each glyph into an SVG...
     let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF) {
         let cff_data = provider.read_table_data(tag::CFF)?;
         let mut cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
         let writer = SVGWriter::new(opts.testcase, opts.flip);
-        writer.glyphs_to_svg(&mut cff, &mut font, &infos, post.as_ref())?
+        writer.glyphs_to_svg(&mut cff, &mut font, &infos)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
         let head = font.head_table()?.ok_or(ParseError::MissingValue)?;
         let loca_data = provider.read_table_data(tag::LOCA)?;
@@ -63,9 +68,15 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             head.index_to_loc_format,
         ))?;
         let glyf_data = provider.read_table_data(tag::GLYF)?;
-        let mut glyf = ReadScope::new(&glyf_data).read_dep::<GlyfTable<'_>>(&loca)?;
+        let glyf = ReadScope::new(&glyf_data).read_dep::<GlyfTable<'_>>(&loca)?;
+        let post_data = provider.table_data(tag::POST)?;
+        let post = post_data
+            .as_ref()
+            .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
+            .transpose()?;
+        let mut glyf_post = GlyfPost { glyf, post };
         let writer = SVGWriter::new(opts.testcase, opts.flip);
-        writer.glyphs_to_svg(&mut glyf, &mut font, &infos, post.as_ref())?
+        writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos)?
     } else {
         eprintln!("no glyf or CFF table");
         return Ok(1);
@@ -92,5 +103,37 @@ fn script_and_lang_from_testcase(testcase: &str) -> (u32, u32) {
     // }
     else {
         (tag::LATN, tag::from_string("ENG ").unwrap())
+    }
+}
+
+impl<'a> GlyphName for CFF<'a> {
+    fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
+        let font = self.fonts.first()?;
+        if font.is_cid_keyed() {
+            return None;
+        }
+        let sid = font.charset.id_for_glyph(glyph_id)?;
+        self.read_string(sid).ok()
+    }
+}
+
+impl<'a> GlyphName for GlyfPost<'a> {
+    fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
+        self.post
+            .as_ref()
+            .and_then(|post| post.glyph_name(glyph_id).ok().flatten())
+            .map(|s| s.to_string())
+    }
+}
+
+impl<'a> OutlineBuilder for GlyfPost<'a> {
+    type Error = ParseError;
+
+    fn visit<V: OutlineSink>(
+        &mut self,
+        glyph_index: u16,
+        visitor: &mut V,
+    ) -> Result<(), Self::Error> {
+        self.glyf.visit(glyph_index, visitor)
     }
 }

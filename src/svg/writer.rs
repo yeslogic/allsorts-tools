@@ -6,10 +6,11 @@ use allsorts::gpos::Info;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::line_segment::LineSegment2F;
 use allsorts::pathfinder_geometry::vector::{vec2f, Vector2F};
-use allsorts::post::PostTable;
 use allsorts::tables::FontTableProvider;
 use allsorts::Font;
 use xmlwriter::XmlWriter;
+
+use super::GlyphName;
 
 struct Symbol {
     glyph_name: String,
@@ -38,10 +39,9 @@ impl SVGWriter {
         builder: &mut T,
         font: &mut Font<F>,
         infos: &[Info],
-        post: Option<&PostTable>,
     ) -> Result<String, T::Error>
     where
-        T: OutlineBuilder,
+        T: OutlineBuilder + GlyphName,
         F: FontTableProvider,
     {
         // Turn each glyph into an SVG...
@@ -59,10 +59,8 @@ impl SVGWriter {
             if let Some(&symbol_index) = symbols.get(&glyph_index) {
                 self.use_glyph(symbol_index, glyph_x, glyph_y)
             } else {
-                let glyph_name = post
-                    .as_ref()
-                    .and_then(|post| post.glyph_name(glyph_index).ok().flatten())
-                    .map(|s| s.to_string())
+                let glyph_name = builder
+                    .gid_to_glyph_name(glyph_index)
                     .unwrap_or_else(|| format!("gid{}", glyph_index));
                 let symbol_index = self.new_glyph(glyph_name);
                 symbols.insert(glyph_index, symbol_index);
