@@ -8,6 +8,7 @@ use allsorts::font_data::FontData;
 use allsorts::gsub::{Features, GsubFeatureMask};
 use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
+use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
@@ -59,13 +60,18 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
 
     // Turn each glyph into an SVG...
     let head = font.head_table()?.ok_or(ParseError::MissingValue)?;
-    let scale = Matrix2x2F::from_scale(FONT_SIZE / f32::from(head.units_per_em));
+    let scale = FONT_SIZE / f32::from(head.units_per_em);
+    let transform = if opts.flip {
+        Matrix2x2F::from_scale(vec2f(scale, -scale))
+    } else {
+        Matrix2x2F::from_scale(scale)
+    };
     let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF)
         && provider.sfnt_version() == tag::OTTO
     {
         let cff_data = provider.read_table_data(tag::CFF)?;
         let mut cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
-        let writer = SVGWriter::new(opts.testcase, opts.flip, scale);
+        let writer = SVGWriter::new(opts.testcase, transform);
         writer.glyphs_to_svg(&mut cff, &mut font, &infos)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
@@ -81,7 +87,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
         let mut glyf_post = GlyfPost { glyf, post };
-        let writer = SVGWriter::new(opts.testcase, opts.flip, scale);
+        let writer = SVGWriter::new(opts.testcase, transform);
         writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos)?
     } else {
         eprintln!("no glyf or CFF table");

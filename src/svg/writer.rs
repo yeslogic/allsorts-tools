@@ -20,19 +20,16 @@ struct Symbol {
 
 pub struct SVGWriter {
     testcase: String,
-    flip: bool,
-    scale: Matrix2x2F,
+    transform: Matrix2x2F,
     symbols: Vec<Symbol>,
     usage: Vec<(usize, Vector2F)>,
 }
 
 impl SVGWriter {
-    // TODO: Merge flip and scale into transform
-    pub fn new(testcase: String, flip: bool, scale: Matrix2x2F) -> Self {
+    pub fn new(testcase: String, transform: Matrix2x2F) -> Self {
         SVGWriter {
             testcase,
-            flip,
-            scale,
+            transform,
             symbols: Vec::new(),
             usage: Vec::new(),
         }
@@ -84,7 +81,8 @@ impl SVGWriter {
     }
 
     fn use_glyph(&mut self, symbol_index: usize, x: f32, y: f32) {
-        self.usage.push((symbol_index, self.scale * vec2f(x, y)));
+        self.usage
+            .push((symbol_index, self.transform * vec2f(x, y)));
     }
 
     fn end(self, x_max: f32, ascender: i16, descender: i16) -> String {
@@ -94,9 +92,9 @@ impl SVGWriter {
         w.write_attribute("version", "1.1");
         w.write_attribute("xmlns", "http://www.w3.org/2000/svg");
         w.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-        let x_max = self.scale.extract_scale().x() * x_max;
-        let ascender = self.scale.extract_scale().y() * f32::from(ascender);
-        let descender = self.scale.extract_scale().y() * f32::from(descender);
+        let x_max = self.transform.extract_scale().x() * x_max;
+        let ascender = self.transform.extract_scale().y() * f32::from(ascender);
+        let descender = self.transform.extract_scale().y() * f32::from(descender);
         let height = ascender - descender;
         let view_box = format!("{} {} {} {}", 0, descender, x_max, height);
         w.write_attribute("viewBox", &view_box);
@@ -130,14 +128,6 @@ impl SVGWriter {
     fn current_path(&mut self) -> &mut String {
         &mut self.symbols.last_mut().unwrap().path
     }
-
-    fn flip(&self, value: f32) -> f32 {
-        if self.flip {
-            -value
-        } else {
-            value
-        }
-    }
 }
 
 impl Symbol {
@@ -151,43 +141,41 @@ impl Symbol {
 
 impl OutlineSink for SVGWriter {
     fn move_to(&mut self, point: Vector2F) {
-        let point = self.scale * point;
-        let y = self.flip(point.y());
+        let point = self.transform * point;
         self.current_path()
-            .push_str(&format!(" M{},{}", point.x(), y));
+            .push_str(&format!(" M{},{}", point.x(), point.y()));
     }
 
     fn line_to(&mut self, point: Vector2F) {
-        let point = self.scale * point;
-        let y = self.flip(point.y());
+        let point = self.transform * point;
         self.current_path()
-            .push_str(&format!(" L{},{}", point.x(), y));
+            .push_str(&format!(" L{},{}", point.x(), point.y()));
     }
 
     fn quadratic_curve_to(&mut self, control: Vector2F, point: Vector2F) {
-        let control = self.scale * control;
-        let point = self.scale * point;
-        let y1 = self.flip(control.y());
-        let y = self.flip(point.y());
-        self.current_path()
-            .push_str(&format!(" Q{},{} {},{}", control.x(), y1, point.x(), y));
+        let control = self.transform * control;
+        let point = self.transform * point;
+        self.current_path().push_str(&format!(
+            " Q{},{} {},{}",
+            control.x(),
+            control.y(),
+            point.x(),
+            point.y()
+        ));
     }
 
     fn cubic_curve_to(&mut self, ctrl: LineSegment2F, to: Vector2F) {
-        let ctrl_from = self.scale * ctrl.from();
-        let ctrl_to = self.scale * ctrl.to();
-        let to = self.scale * to;
-        let y1 = self.flip(ctrl_from.y());
-        let y2 = self.flip(ctrl_to.y());
-        let y = self.flip(to.y());
+        let ctrl_from = self.transform * ctrl.from();
+        let ctrl_to = self.transform * ctrl.to();
+        let to = self.transform * to;
         self.current_path().push_str(&format!(
             " C{},{} {},{} {},{}",
             ctrl_from.x(),
-            y1,
+            ctrl_from.y(),
             ctrl_to.x(),
-            y2,
+            ctrl_to.y(),
             to.x(),
-            y
+            to.y()
         ));
     }
 
