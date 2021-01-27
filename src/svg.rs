@@ -42,7 +42,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     };
 
     // Map text to glyphs and then apply font shaping
-    let glyphs = font.map_glyphs(&opts.render, MatchingPresentation::NotRequired);
+    let glyphs = font.map_glyphs(&opts.render, script, MatchingPresentation::NotRequired);
     let infos = font.shape(
         glyphs,
         script,

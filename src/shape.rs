@@ -22,7 +22,7 @@ pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
             return Ok(1);
         }
     };
-    let glyphs = font.map_glyphs(&opts.text, MatchingPresentation::NotRequired);
+    let glyphs = font.map_glyphs(&opts.text, script, MatchingPresentation::NotRequired);
     let infos = font.shape(
         glyphs,
         script,
