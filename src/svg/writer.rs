@@ -5,6 +5,7 @@ use allsorts::context::Glyph;
 use allsorts::gpos::Info;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::line_segment::LineSegment2F;
+use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::{vec2f, Vector2F};
 use allsorts::tables::FontTableProvider;
 use allsorts::Font;
@@ -20,15 +21,18 @@ struct Symbol {
 pub struct SVGWriter {
     testcase: String,
     flip: bool,
+    scale: Matrix2x2F,
     symbols: Vec<Symbol>,
     usage: Vec<(usize, Vector2F)>,
 }
 
 impl SVGWriter {
-    pub fn new(testcase: String, flip: bool) -> Self {
+    // TODO: Merge flip and scale into transform
+    pub fn new(testcase: String, flip: bool, scale: Matrix2x2F) -> Self {
         SVGWriter {
             testcase,
             flip,
+            scale,
             symbols: Vec::new(),
             usage: Vec::new(),
         }
@@ -80,7 +84,7 @@ impl SVGWriter {
     }
 
     fn use_glyph(&mut self, symbol_index: usize, x: f32, y: f32) {
-        self.usage.push((symbol_index, vec2f(x, y)));
+        self.usage.push((symbol_index, self.scale * vec2f(x, y)));
     }
 
     fn end(self, x_max: f32, ascender: i16, descender: i16) -> String {
@@ -90,6 +94,9 @@ impl SVGWriter {
         w.write_attribute("version", "1.1");
         w.write_attribute("xmlns", "http://www.w3.org/2000/svg");
         w.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+        let x_max = self.scale.extract_scale().x() * x_max;
+        let ascender = self.scale.extract_scale().y() * f32::from(ascender);
+        let descender = self.scale.extract_scale().y() * f32::from(descender);
         let height = ascender - descender;
         let view_box = format!("{} {} {} {}", 0, descender, x_max, height);
         w.write_attribute("viewBox", &view_box);
@@ -144,18 +151,22 @@ impl Symbol {
 
 impl OutlineSink for SVGWriter {
     fn move_to(&mut self, point: Vector2F) {
+        let point = self.scale * point;
         let y = self.flip(point.y());
         self.current_path()
             .push_str(&format!(" M{},{}", point.x(), y));
     }
 
     fn line_to(&mut self, point: Vector2F) {
+        let point = self.scale * point;
         let y = self.flip(point.y());
         self.current_path()
             .push_str(&format!(" L{},{}", point.x(), y));
     }
 
     fn quadratic_curve_to(&mut self, control: Vector2F, point: Vector2F) {
+        let control = self.scale * control;
+        let point = self.scale * point;
         let y1 = self.flip(control.y());
         let y = self.flip(point.y());
         self.current_path()
@@ -163,14 +174,17 @@ impl OutlineSink for SVGWriter {
     }
 
     fn cubic_curve_to(&mut self, ctrl: LineSegment2F, to: Vector2F) {
-        let y1 = self.flip(ctrl.from().y());
-        let y2 = self.flip(ctrl.to().y());
+        let ctrl_from = self.scale * ctrl.from();
+        let ctrl_to = self.scale * ctrl.to();
+        let to = self.scale * to;
+        let y1 = self.flip(ctrl_from.y());
+        let y2 = self.flip(ctrl_to.y());
         let y = self.flip(to.y());
         self.current_path().push_str(&format!(
             " C{},{} {},{} {},{}",
-            ctrl.from().x(),
+            ctrl_from.x(),
             y1,
-            ctrl.to().x(),
+            ctrl_to.x(),
             y2,
             to.x(),
             y
