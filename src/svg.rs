@@ -18,8 +18,7 @@ use crate::BoxError;
 
 pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     // Read and parse the font
-    let script = tag::LATN;
-    let lang = tag::from_string("ENG ")?;
+    let (script, lang) = script_and_lang_from_testcase(&opts.testcase);
     let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
@@ -75,4 +74,23 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     println!("{}", svg);
 
     Ok(0)
+}
+
+fn script_and_lang_from_testcase(testcase: &str) -> (u32, u32) {
+    if testcase.starts_with("SHARAN") {
+        (tag::ARAB, tag::from_string("URD ").unwrap())
+    } else if testcase.starts_with("SHBALI") {
+        (
+            tag::from_string("bali").unwrap(),
+            tag::from_string("BAN ").unwrap(),
+        )
+    } else if testcase.starts_with("SHKNDA") {
+        (tag::KNDA, tag::from_string("KAN ").unwrap())
+    }
+    // else if testcase.starts_with("SHLANA") {
+    //     tag::from_string("LANA").unwrap()
+    // }
+    else {
+        (tag::LATN, tag::from_string("ENG ").unwrap())
+    }
 }
