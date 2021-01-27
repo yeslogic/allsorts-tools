@@ -97,11 +97,12 @@ fn script_and_lang_from_testcase(testcase: &str) -> (u32, u32) {
         )
     } else if testcase.starts_with("SHKNDA") {
         (tag::KNDA, tag::from_string("KAN ").unwrap())
-    }
-    // else if testcase.starts_with("SHLANA") {
-    //     tag::from_string("LANA").unwrap()
-    // }
-    else {
+    } else if testcase.starts_with("SHLANA") {
+        (
+            tag::from_string("THA ").unwrap(),
+            tag::from_string("lana").unwrap(),
+        )
+    } else {
         (tag::LATN, tag::from_string("ENG ").unwrap())
     }
 }
