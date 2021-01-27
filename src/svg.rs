@@ -7,6 +7,7 @@ use allsorts::font::{GlyphTableFlags, MatchingPresentation};
 use allsorts::font_data::FontData;
 use allsorts::gsub::{Features, GsubFeatureMask};
 use allsorts::outline::{OutlineBuilder, OutlineSink};
+use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::post::PostTable;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
@@ -16,6 +17,8 @@ use allsorts::{tag, Font};
 use crate::cli::SvgOpts;
 use crate::svg::writer::SVGWriter;
 use crate::BoxError;
+
+const FONT_SIZE: f32 = 1000.0;
 
 pub trait GlyphName {
     fn gid_to_glyph_name(&self, gid: u16) -> Option<String>;
@@ -56,6 +59,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
 
     // Turn each glyph into an SVG...
     let head = font.head_table()?.ok_or(ParseError::MissingValue)?;
+    let scale = Matrix2x2F::from_scale(FONT_SIZE / f32::from(head.units_per_em));
     let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF)
         && provider.sfnt_version() == tag::OTTO
     {
@@ -77,7 +81,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
         let mut glyf_post = GlyfPost { glyf, post };
-        let writer = SVGWriter::new(opts.testcase, opts.flip);
+        let writer = SVGWriter::new(opts.testcase, opts.flip, scale);
         writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos)?
     } else {
         eprintln!("no glyf or CFF table");
