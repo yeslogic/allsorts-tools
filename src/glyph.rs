@@ -1,6 +1,6 @@
 use allsorts::context::Glyph;
 use allsorts::error::ParseError;
-use allsorts::gpos::{Info, MarkPlacement, Placement};
+use allsorts::gpos::{Attachment, Info, Placement};
 use allsorts::gsub::{GlyphOrigin, RawGlyph};
 use allsorts::tables::cmap::CmapSubtable;
 use allsorts::tables::FontTableProvider;
@@ -55,19 +55,16 @@ pub fn calculate_glyph_positions<T: FontTableProvider>(
 
     for info in infos.iter() {
         let advance = glyph_advance(font, info, vertical)?;
-        let position = match info.mark_placement {
-            MarkPlacement::None => {
-                match info.placement {
-                    Placement::None => (advance, x, y),
-                    Placement::Distance(dx, dy) => (advance, x + dx, y + dy),
-                    Placement::Anchor(_, _) => (advance, x, y), // TODO: position anchors for cursive
-                }
-            }
-            MarkPlacement::MarkAnchor(base_index, base_anchor, mark_anchor) => {
+        let position = match info.attachment {
+            Attachment::None => match info.placement {
+                Placement::None => (advance, x, y),
+                Placement::Distance(dx, dy) => (advance, x + dx, y + dy),
+            },
+            Attachment::MarkAnchor(base_index, base_anchor, mark_anchor) => {
                 match (positions.get(base_index), infos.get(base_index)) {
                     (Some((_, base_x, base_y)), Some(base_info)) => {
                         let (dx, dy) = match base_info.placement {
-                            Placement::None | Placement::Anchor(_, _) => (0, 0),
+                            Placement::None => (0, 0),
                             Placement::Distance(dx, dy) => (dx, dy),
                         };
                         (
@@ -80,7 +77,12 @@ pub fn calculate_glyph_positions<T: FontTableProvider>(
                     _ => (advance, x, y),
                 }
             }
-            MarkPlacement::MarkOverprint(base_index) => positions[base_index],
+            Attachment::MarkOverprint(base_index) => positions[base_index],
+            Attachment::CursiveAnchor(
+                _exit_glyph_index,
+                _exit_glyph_anchor,
+                _entry_glyph_anchor,
+            ) => (advance, x, y), // TODO: position anchors for cursive
         };
         positions.push(position);
 
