@@ -52,6 +52,16 @@ pub(crate) fn make(
     }
 }
 
+pub struct GlyphLayout<'f, 'i, T>
+where
+    T: FontTableProvider,
+{
+    font: &'f mut Font<T>,
+    infos: &'i [Info],
+    direction: TextDirection,
+    vertical: bool,
+}
+
 #[derive(Debug, Default, Copy, Clone)]
 pub struct GlyphPosition {
     pub hori_advance: i32,
@@ -61,82 +71,96 @@ pub struct GlyphPosition {
     cursive_attachment: Option<u16>,
 }
 
-impl GlyphPosition {
-    pub const fn new(hori_advance: i32, vert_advance: i32, x_offset: i32, y_offset: i32) -> Self {
-        GlyphPosition {
-            hori_advance,
-            vert_advance,
-            x_offset,
-            y_offset,
-            cursive_attachment: None,
+impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
+    pub fn new(
+        font: &'f mut Font<T>,
+        infos: &'i [Info],
+        direction: TextDirection,
+        vertical: bool,
+    ) -> Self {
+        GlyphLayout {
+            font,
+            infos,
+            direction,
+            vertical,
         }
     }
-}
 
-pub fn calculate_glyph_positions<T: FontTableProvider>(
-    font: &mut Font<T>,
-    infos: &[Info],
-    direction: TextDirection,
-    vertical: bool,
-) -> Result<Vec<GlyphPosition>, BoxError> {
-    let mut has_marks = false;
-    let mut has_cursive_connection = false;
-    let mut positions = vec![GlyphPosition::default(); infos.len()];
-    for (i, info) in infos.iter().enumerate() {
-        let (hori_advance, vert_advance) = glyph_advance(font, info, vertical)?;
-        match info.attachment {
-            Attachment::None => match info.placement {
-                Placement::None => {
-                    positions[i] = GlyphPosition::new(hori_advance, vert_advance, 0, 0)
-                }
-                Placement::Distance(dx, dy) => {
-                    positions[i] = GlyphPosition::new(hori_advance, vert_advance, dx, dy)
-                }
-            },
-            Attachment::MarkAnchor(base_index, base_anchor, mark_anchor) => {
-                has_marks = true;
-                match infos.get(base_index) {
-                    Some(base_info) => {
-                        // TODO: Do this later?
-                        let (dx, dy) = match base_info.placement {
-                            Placement::None => (0, 0),
-                            Placement::Distance(dx, dy) => (dx, dy),
-                        };
-                        let offset_x = i32::from(base_anchor.x) - i32::from(mark_anchor.x) + dx;
-                        let offset_y = i32::from(base_anchor.y) - i32::from(mark_anchor.y) + dy;
-                        positions[i] =
-                            GlyphPosition::new(hori_advance, vert_advance, offset_x, offset_y);
+    pub fn glyph_positions(&mut self) -> Result<Vec<GlyphPosition>, BoxError> {
+        let mut has_marks = false;
+        let mut has_cursive_connection = false;
+        let mut positions = vec![GlyphPosition::default(); self.infos.len()];
+
+        for (i, info) in self.infos.iter().enumerate() {
+            let (hori_advance, vert_advance) = glyph_advance(self.font, info, self.vertical)?;
+            match info.attachment {
+                Attachment::None => match info.placement {
+                    Placement::None => {
+                        positions[i] = GlyphPosition::new(hori_advance, vert_advance, 0, 0)
                     }
-                    None => {
-                        return Err(ParseError::BadIndex.into());
+                    Placement::Distance(dx, dy) => {
+                        positions[i] = GlyphPosition::new(hori_advance, vert_advance, dx, dy)
+                    }
+                },
+                Attachment::MarkAnchor(base_index, base_anchor, mark_anchor) => {
+                    has_marks = true;
+                    match self.infos.get(base_index) {
+                        Some(base_info) => {
+                            // TODO: Do this later?
+                            let (dx, dy) = match base_info.placement {
+                                Placement::None => (0, 0),
+                                Placement::Distance(dx, dy) => (dx, dy),
+                            };
+                            let offset_x = i32::from(base_anchor.x) - i32::from(mark_anchor.x) + dx;
+                            let offset_y = i32::from(base_anchor.y) - i32::from(mark_anchor.y) + dy;
+                            positions[i] =
+                                GlyphPosition::new(hori_advance, vert_advance, offset_x, offset_y);
+                        }
+                        None => {
+                            return Err(ParseError::BadIndex.into());
+                        }
                     }
                 }
-            }
-            Attachment::MarkOverprint(base_index) => {
-                has_marks = true;
-                // FIXME: Should there be zero advance in this case?
-                infos.get(base_index).ok_or(ParseError::BadIndex)?;
-            }
-            Attachment::CursiveAnchor(exit_glyph_index, _, _, _) => {
-                has_cursive_connection = true;
-                // Validate index
-                infos.get(exit_glyph_index).ok_or(ParseError::BadIndex)?;
+                Attachment::MarkOverprint(base_index) => {
+                    has_marks = true;
+                    // FIXME: Should there be zero advance in this case?
+                    self.infos.get(base_index).ok_or(ParseError::BadIndex)?;
+                }
+                Attachment::CursiveAnchor(exit_glyph_index, _, _, _) => {
+                    has_cursive_connection = true;
+                    // Validate index
+                    self.infos
+                        .get(exit_glyph_index)
+                        .ok_or(ParseError::BadIndex)?;
 
-                // Link to exit glyph
-                positions[exit_glyph_index].cursive_attachment = Some(u16::try_from(i)?);
-                positions[i] = GlyphPosition {
-                    hori_advance,
-                    vert_advance,
-                    ..positions[i]
-                };
-            }
-        };
+                    // Link to exit glyph
+                    positions[exit_glyph_index].cursive_attachment = Some(u16::try_from(i)?);
+                    positions[i] = GlyphPosition {
+                        hori_advance,
+                        vert_advance,
+                        ..positions[i]
+                    };
+                }
+            };
+        }
+
+        if has_cursive_connection {
+            // Now that we know all base glyphs are positioned we do a second pass to apply
+            // cursive attachment adjustments
+            self.adjust_cursive_connections(&mut positions);
+        }
+
+        if has_marks {
+            // Now that cursive connected glyphs are positioned, ensure marks are positioned on their
+            // base properly.
+            self.position_marks(&mut positions);
+        }
+
+        Ok(positions)
     }
 
-    if has_cursive_connection {
-        // Now that we know all base glyphs are positioned we do a second pass to apply
-        // cursive attachment adjustments
-        for (i, info) in infos.iter().enumerate() {
+    fn adjust_cursive_connections(&self, positions: &mut [GlyphPosition]) {
+        for (i, info) in self.infos.iter().enumerate() {
             match info.attachment {
                 Attachment::None
                 | Attachment::MarkAnchor(_, _, _)
@@ -174,7 +198,7 @@ pub fn calculate_glyph_positions<T: FontTableProvider>(
 
                     // Line-layout direction
                     // FIXME: Handle vertical text
-                    match direction {
+                    match self.direction {
                         TextDirection::LeftToRight => {
                             positions[first_glyph_index].hori_advance =
                                 i32::from(entry_glyph_anchor.x)
@@ -195,10 +219,10 @@ pub fn calculate_glyph_positions<T: FontTableProvider>(
                         {
                             adjust_cursive_chain(
                                 dy,
-                                direction,
+                                self.direction,
                                 usize::from(linked_index),
-                                infos,
-                                &mut positions,
+                                self.infos,
+                                positions,
                             );
                         }
                     } else {
@@ -208,10 +232,10 @@ pub fn calculate_glyph_positions<T: FontTableProvider>(
                         {
                             adjust_cursive_chain(
                                 dy,
-                                direction,
+                                self.direction,
                                 usize::from(linked_index),
-                                infos,
-                                &mut positions,
+                                self.infos,
+                                positions,
                             );
                         }
                     }
@@ -220,15 +244,13 @@ pub fn calculate_glyph_positions<T: FontTableProvider>(
         }
     }
 
-    if has_marks {
-        // Now that cursive connected glyphs are positioned, ensure marks are positioned on their
-        // base properly.
-        for (i, info) in infos.iter().enumerate() {
+    fn position_marks(&self, positions: &mut [GlyphPosition]) {
+        for (i, info) in self.infos.iter().enumerate() {
             match info.attachment {
                 Attachment::None | Attachment::CursiveAnchor(_, _, _, _) => {}
                 Attachment::MarkAnchor(base_index, _, _) => {
                     let base_pos = positions[base_index];
-                    let (hori_advance_offset, vert_advance_offset) = match direction {
+                    let (hori_advance_offset, vert_advance_offset) = match self.direction {
                         TextDirection::LeftToRight => sum_advance(positions.get(base_index..i)),
                         TextDirection::RightToLeft => sum_advance(positions.get(i..base_index)),
                     };
@@ -240,7 +262,7 @@ pub fn calculate_glyph_positions<T: FontTableProvider>(
 
                     // Shift the mark back the advance of the base glyph and glyphs leading to it
                     // so that it is positioned above it
-                    match direction {
+                    match self.direction {
                         TextDirection::LeftToRight => {
                             position.x_offset -= hori_advance_offset;
                             position.y_offset -= vert_advance_offset;
@@ -260,7 +282,18 @@ pub fn calculate_glyph_positions<T: FontTableProvider>(
             }
         }
     }
-    Ok(positions)
+}
+
+impl GlyphPosition {
+    pub const fn new(hori_advance: i32, vert_advance: i32, x_offset: i32, y_offset: i32) -> Self {
+        GlyphPosition {
+            hori_advance,
+            vert_advance,
+            x_offset,
+            y_offset,
+            cursive_attachment: None,
+        }
+    }
 }
 
 fn adjust_cursive_chain(

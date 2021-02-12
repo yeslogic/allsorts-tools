@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::glyph::{calculate_glyph_positions, GlyphPosition, TextDirection};
+use crate::glyph::{GlyphLayout, GlyphPosition, TextDirection};
 use allsorts::context::Glyph;
 use allsorts::gpos::Info;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
@@ -46,7 +46,9 @@ impl SVGWriter {
         T: OutlineBuilder + GlyphName,
         F: FontTableProvider,
     {
-        let glyph_positions = calculate_glyph_positions(font, infos, direction, false)
+        let mut layout = GlyphLayout::new(font, infos, direction, false);
+        let glyph_positions = layout
+            .glyph_positions()
             .expect("FIXME calculate_glyph_positions");
         let iter = infos.iter().zip(glyph_positions.iter().copied());
         match direction {
