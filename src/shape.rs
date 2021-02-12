@@ -5,7 +5,7 @@ use allsorts::gsub::{Features, GsubFeatureMask};
 use allsorts::tag;
 
 use crate::cli::ShapeOpts;
-use crate::glyph::calculate_glyph_positions;
+use crate::glyph::{calculate_glyph_positions, TextDirection};
 use crate::BoxError;
 
 pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
@@ -30,10 +30,18 @@ pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
         &Features::Mask(GsubFeatureMask::default()),
         true,
     )?;
-    let positions = calculate_glyph_positions(&mut font, &infos, opts.vertical)?;
+    let positions =
+        calculate_glyph_positions(&mut font, &infos, TextDirection::LeftToRight, opts.vertical)?;
 
-    for (glyph, (advance, x, y)) in infos.iter().zip(&positions) {
-        println!("{} ({}, {}) {:#?}", advance, x, y, glyph);
+    for (glyph, position) in infos.iter().zip(&positions) {
+        println!(
+            "{},{} ({}, {}) {:#?}",
+            position.hori_advance,
+            position.vert_advance,
+            position.x_offset,
+            position.y_offset,
+            glyph
+        );
     }
 
     Ok(0)

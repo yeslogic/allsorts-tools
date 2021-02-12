@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::glyph::calculate_glyph_positions;
+use crate::glyph::{calculate_glyph_positions, GlyphPosition, TextDirection};
 use allsorts::context::Glyph;
 use allsorts::gpos::Info;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
@@ -36,29 +36,48 @@ impl SVGWriter {
     }
 
     pub fn glyphs_to_svg<F, T>(
-        mut self,
+        self,
         builder: &mut T,
         font: &mut Font<F>,
         infos: &[Info],
+        direction: TextDirection,
     ) -> Result<String, T::Error>
     where
         T: OutlineBuilder + GlyphName,
         F: FontTableProvider,
     {
+        let glyph_positions = calculate_glyph_positions(font, infos, direction, false)
+            .expect("FIXME calculate_glyph_positions");
+        let iter = infos.iter().zip(glyph_positions.iter().copied());
+        match direction {
+            TextDirection::LeftToRight => self.glyphs_to_svg_impl(builder, font, iter),
+            TextDirection::RightToLeft => self.glyphs_to_svg_impl(builder, font, iter.rev()),
+        }
+    }
+
+    fn glyphs_to_svg_impl<'infos, F, T, I>(
+        mut self,
+        builder: &mut T,
+        font: &mut Font<F>,
+        iter: I,
+    ) -> Result<String, T::Error>
+    where
+        T: OutlineBuilder + GlyphName,
+        F: FontTableProvider,
+        I: Iterator<Item = (&'infos Info, GlyphPosition)>,
+    {
         // Turn each glyph into an SVG...
         let mut x = 0.;
         let mut y = 0.;
-        let glyph_positions =
-            calculate_glyph_positions(font, infos, false).expect("FIXME calculate_glyph_positions");
-        let glyph_positions_iter = glyph_positions
-            .iter()
-            .copied()
-            .map(|(a, x, y)| (a as f32, x as f32, y as f32));
         let mut symbols = HashMap::new();
-        for (info, (advance, glyph_x, glyph_y)) in infos.iter().zip(glyph_positions_iter) {
+        for (info, pos) in iter {
             let glyph_index = info.get_glyph_index();
             if let Some(&symbol_index) = symbols.get(&glyph_index) {
-                self.use_glyph(symbol_index, glyph_x, glyph_y)
+                self.use_glyph(
+                    symbol_index,
+                    x + pos.x_offset as f32,
+                    y + pos.y_offset as f32,
+                )
             } else {
                 let glyph_name = builder
                     .gid_to_glyph_name(glyph_index)
@@ -66,9 +85,14 @@ impl SVGWriter {
                 let symbol_index = self.new_glyph(glyph_name);
                 symbols.insert(glyph_index, symbol_index);
                 builder.visit(glyph_index, &mut self)?;
-                self.use_glyph(symbol_index, glyph_x, glyph_y);
+                self.use_glyph(
+                    symbol_index,
+                    x + pos.x_offset as f32,
+                    y + pos.y_offset as f32,
+                );
             }
-            x += advance;
+            x += pos.hori_advance as f32;
+            y += pos.vert_advance as f32;
         }
 
         Ok(self.end(x, font.hhea_table.ascender, font.hhea_table.descender))
@@ -96,7 +120,13 @@ impl SVGWriter {
         let ascender = self.transform.extract_scale().y() * f32::from(ascender);
         let descender = self.transform.extract_scale().y() * f32::from(descender);
         let height = ascender - descender;
-        let view_box = format!("{} {} {} {}", 0, descender, x_max, height);
+        let view_box = format!(
+            "{} {} {} {}",
+            0,
+            descender.round(),
+            x_max.round(),
+            height.round()
+        );
         w.write_attribute("viewBox", &view_box);
 
         // Write symbols
@@ -117,8 +147,8 @@ impl SVGWriter {
             let symbol = &self.symbols[symbol_index];
             let href = format!("#{}.{}", self.testcase, symbol.glyph_name);
             w.write_attribute("xlink:href", &href);
-            w.write_attribute("x", &point.x());
-            w.write_attribute("y", &point.y());
+            w.write_attribute("x", &point.x().round());
+            w.write_attribute("y", &point.y().round());
             w.end_element();
         }
 

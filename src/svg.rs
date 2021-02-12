@@ -16,6 +16,7 @@ use allsorts::tables::{FontTableProvider, SfntVersion};
 use allsorts::{tag, Font};
 
 use crate::cli::SvgOpts;
+use crate::script;
 use crate::svg::writer::SVGWriter;
 use crate::BoxError;
 
@@ -54,6 +55,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
         &Features::Mask(GsubFeatureMask::default()),
         true,
     )?;
+    let direction = script::direction(script);
 
     // TODO: Can we avoid creating a new table provider?
     let provider = font_file.table_provider(0)?;
@@ -72,7 +74,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
         let cff_data = provider.read_table_data(tag::CFF)?;
         let mut cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
         let writer = SVGWriter::new(opts.testcase, transform);
-        writer.glyphs_to_svg(&mut cff, &mut font, &infos)?
+        writer.glyphs_to_svg(&mut cff, &mut font, &infos, direction)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
         let loca = ReadScope::new(&loca_data).read_dep::<LocaTable<'_>>((
@@ -88,7 +90,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             .transpose()?;
         let mut glyf_post = GlyfPost { glyf, post };
         let writer = SVGWriter::new(opts.testcase, transform);
-        writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos)?
+        writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction)?
     } else {
         eprintln!("no glyf or CFF table");
         return Ok(1);
