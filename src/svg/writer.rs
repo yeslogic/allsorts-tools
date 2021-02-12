@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::glyph::{GlyphLayout, GlyphPosition, TextDirection};
 use allsorts::context::Glyph;
 use allsorts::gpos::Info;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
@@ -12,6 +11,8 @@ use allsorts::Font;
 use xmlwriter::XmlWriter;
 
 use super::GlyphName;
+use crate::glyph::{GlyphLayout, GlyphPosition, TextDirection};
+use crate::BoxError;
 
 struct Symbol {
     glyph_name: String,
@@ -41,20 +42,20 @@ impl SVGWriter {
         font: &mut Font<F>,
         infos: &[Info],
         direction: TextDirection,
-    ) -> Result<String, T::Error>
+    ) -> Result<String, BoxError>
     where
         T: OutlineBuilder + GlyphName,
         F: FontTableProvider,
     {
         let mut layout = GlyphLayout::new(font, infos, direction, false);
-        let glyph_positions = layout
-            .glyph_positions()
-            .expect("FIXME calculate_glyph_positions");
+        let glyph_positions = layout.glyph_positions()?;
         let iter = infos.iter().zip(glyph_positions.iter().copied());
-        match direction {
+        let svg = match direction {
             TextDirection::LeftToRight => self.glyphs_to_svg_impl(builder, font, iter),
             TextDirection::RightToLeft => self.glyphs_to_svg_impl(builder, font, iter.rev()),
         }
+        .map_err(|err| format!("error buliding SVG: {}", err))?;
+        Ok(svg)
     }
 
     fn glyphs_to_svg_impl<'infos, F, T, I>(
