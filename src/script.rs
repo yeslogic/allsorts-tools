@@ -1,4 +1,4 @@
-use crate::glyph::TextDirection;
+use allsorts::glyph_position::TextDirection;
 
 mod rtl_tags {
     use allsorts::tag;
