@@ -480,11 +480,13 @@ fn dump_glyph(provider: &impl FontTableProvider, glyph_id: u16) -> Result<(), Pa
     let scope = ReadScope::new(table.borrow());
     let glyf = scope.read_dep::<GlyfTable>(&loca)?;
 
-    let glyph = glyf
+    let mut glyph = glyf
         .records
         .get(usize::from(glyph_id))
-        .ok_or(ParseError::BadValue)?;
-    println!("{:#?}", glyph.clone().parse()?);
+        .ok_or(ParseError::BadValue)?
+        .clone();
+    glyph.parse()?;
+    println!("{:#?}", glyph);
 
     Ok(())
 }
