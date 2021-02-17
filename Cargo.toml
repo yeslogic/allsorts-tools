@@ -17,3 +17,7 @@ png = "0.15.3"
 
 [dependencies.allsorts]
 version = "0.5.0"
+
+[dev-dependencies]
+assert_cmd = "1"
+predicates = "1"
