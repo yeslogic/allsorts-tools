@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use allsorts::context::Glyph;
+use allsorts::glyph_position::{GlyphLayout, GlyphPosition, TextDirection};
 use allsorts::gpos::Info;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::line_segment::LineSegment2F;
@@ -11,7 +12,6 @@ use allsorts::Font;
 use xmlwriter::XmlWriter;
 
 use super::GlyphName;
-use crate::glyph::{GlyphLayout, GlyphPosition, TextDirection};
 use crate::BoxError;
 
 struct Symbol {
