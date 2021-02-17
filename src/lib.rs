@@ -7,7 +7,6 @@ mod script;
 pub mod shape;
 pub mod subset;
 pub mod svg;
-mod unicode;
 pub mod validate;
 
 use std::error::Error;

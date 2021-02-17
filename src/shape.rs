@@ -1,11 +1,11 @@
 use allsorts::binary::read::ReadScope;
 use allsorts::font::{Font, MatchingPresentation};
 use allsorts::font_data::FontData;
+use allsorts::glyph_position::{GlyphLayout, TextDirection};
 use allsorts::gsub::{Features, GsubFeatureMask};
 use allsorts::tag;
 
 use crate::cli::ShapeOpts;
-use crate::glyph::{GlyphLayout, TextDirection};
 use crate::BoxError;
 
 pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
