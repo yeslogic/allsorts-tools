@@ -10,16 +10,21 @@ use crate::BoxError;
 
 pub fn main(opts: HasTableOpts) -> Result<i32, BoxError> {
     let table = tag::from_string(&opts.table)?;
-    let buffer = std::fs::read(&opts.font)?;
-    let scope = ReadScope::new(&buffer);
-    let font_file = scope.read::<FontData>()?;
-    let table_provider = font_file.table_provider(opts.index)?;
-    if table_provider.has_table(table) {
-        if opts.print_file {
-            println!("{}", opts.font);
+    let mut found = false;
+    for path in opts.fonts {
+        let buffer = std::fs::read(&path)?;
+        let scope = ReadScope::new(&buffer);
+        let font_file = scope.read::<FontData>()?;
+        let table_provider = font_file.table_provider(opts.index)?;
+        let has_table = if opts.invert_match {
+            !table_provider.has_table(table)
+        } else {
+            table_provider.has_table(table)
+        };
+        found |= has_table;
+        if has_table && opts.print_file {
+            println!("{}", path.to_string_lossy());
         }
-        Ok(0)
-    } else {
-        Ok(1)
     }
+    Ok(if found { 0 } else { 1 })
 }

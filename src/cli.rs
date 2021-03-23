@@ -1,3 +1,5 @@
+use std::ffi::OsString;
+
 use gumdrop::Options;
 
 #[derive(Debug, Options)]
@@ -107,7 +109,7 @@ pub struct HasTableOpts {
     pub table: String,
 
     #[options(
-        help = "index of the font to dump (for TTC, WOFF2)",
+        help = "index of the font to check (for TTC, WOFF2)",
         meta = "INDEX",
         default = "0"
     )]
@@ -116,8 +118,11 @@ pub struct HasTableOpts {
     #[options(help = "print file name")]
     pub print_file: bool,
 
-    #[options(free, required, help = "path to font to dump")]
-    pub font: String,
+    #[options(short = "v", help = "select fonts that don't have the given table")]
+    pub invert_match: bool,
+
+    #[options(free, required, help = "paths of fonts to check")]
+    pub fonts: Vec<OsString>,
 }
 
 #[derive(Debug, Options)]
