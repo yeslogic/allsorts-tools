@@ -7,7 +7,7 @@ os:
 
 rust:
   - stable
-  - 1.38.0
+  - 1.51.0
 
 before_script:
   - rustup component add rustfmt

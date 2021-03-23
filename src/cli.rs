@@ -203,7 +203,7 @@ pub struct SvgOpts {
     #[options(required, help = "path to font file", meta = "PATH")]
     pub font: String,
 
-    #[options(required, help = "name of test case", meta = "NAME")]
+    #[options(help = "name of test case", meta = "NAME", default = "allsorts")]
     pub testcase: String,
 
     #[options(required, help = "text to render", meta = "TEXT")]

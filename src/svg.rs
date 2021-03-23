@@ -5,7 +5,7 @@ use allsorts::cff::CFF;
 use allsorts::error::ParseError;
 use allsorts::font::{GlyphTableFlags, MatchingPresentation};
 use allsorts::font_data::FontData;
-use allsorts::gsub::{Features, GsubFeatureMask};
+use allsorts::gsub::{FeatureMask, Features};
 use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
@@ -48,13 +48,15 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
 
     // Map text to glyphs and then apply font shaping
     let glyphs = font.map_glyphs(&opts.render, script, MatchingPresentation::NotRequired);
-    let infos = font.shape(
-        glyphs,
-        script,
-        Some(lang),
-        &Features::Mask(GsubFeatureMask::default()),
-        true,
-    )?;
+    let infos = font
+        .shape(
+            glyphs,
+            script,
+            Some(lang),
+            &Features::Mask(FeatureMask::default()),
+            true,
+        )
+        .map_err(|(err, _infos)| err)?;
     let direction = script::direction(script);
 
     // TODO: Can we avoid creating a new table provider?
