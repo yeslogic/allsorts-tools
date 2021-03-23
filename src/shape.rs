@@ -2,7 +2,7 @@ use allsorts::binary::read::ReadScope;
 use allsorts::font::{Font, MatchingPresentation};
 use allsorts::font_data::FontData;
 use allsorts::glyph_position::{GlyphLayout, TextDirection};
-use allsorts::gsub::{Features, GsubFeatureMask};
+use allsorts::gsub::{FeatureMask, Features};
 use allsorts::tag;
 
 use crate::cli::ShapeOpts;
@@ -23,13 +23,15 @@ pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
         }
     };
     let glyphs = font.map_glyphs(&opts.text, script, MatchingPresentation::NotRequired);
-    let infos = font.shape(
-        glyphs,
-        script,
-        Some(lang),
-        &Features::Mask(GsubFeatureMask::default()),
-        true,
-    )?;
+    let infos = font
+        .shape(
+            glyphs,
+            script,
+            Some(lang),
+            &Features::Mask(FeatureMask::default()),
+            true,
+        )
+        .map_err(|(err, _infos)| err)?;
     let mut layout = GlyphLayout::new(&mut font, &infos, TextDirection::LeftToRight, opts.vertical);
     let positions = layout.glyph_positions()?;
 
