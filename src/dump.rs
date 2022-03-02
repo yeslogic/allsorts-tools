@@ -12,7 +12,7 @@ use allsorts::error::ParseError;
 use allsorts::font::read_cmap_subtable;
 use allsorts::font_data::FontData;
 use allsorts::glyph_info::GlyphNames;
-use allsorts::tables::cmap::{Cmap, CmapSubtable, EncodingId, PlatformId};
+use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::{
@@ -76,7 +76,7 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
             FontData::Woff(woff_file) => dump_woff(woff_file, table)?,
             FontData::Woff2(woff_file) => dump_woff2(
                 woff_file.table_data_block_scope(),
-                &woff_file,
+                woff_file,
                 table,
                 opts.index,
             )?,
@@ -100,7 +100,7 @@ fn dump_ttc<'a>(
     for offset_table_offset in &ttc.offset_tables {
         let offset_table_offset = usize::try_from(offset_table_offset).map_err(ParseError::from)?;
         let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
-        dump_ttf(provider, &scope, &offset_table, tag, flags)?;
+        dump_ttf(provider, scope, &offset_table, tag, flags)?;
     }
     println!();
     Ok(())
@@ -114,7 +114,7 @@ fn dump_ttf<'a>(
     flags: Flags,
 ) -> Result<(), BoxError> {
     if let Some(tag) = tag {
-        return dump_raw_table(ttf.read_table(&scope, tag)?);
+        return dump_raw_table(ttf.read_table(scope, tag)?);
     }
 
     println!("TTF");
@@ -129,19 +129,19 @@ fn dump_ttf<'a>(
             table_record.offset,
             table_record.length
         );
-        let table = table_record.read_table(&scope)?;
+        let table = table_record.read_table(scope)?;
 
         if table_record.table_tag == tag::MAXP {
             let maxp = table.read::<MaxpTable>()?;
             println!(" - num_glpyhs: {}", maxp.num_glyphs);
         }
     }
-    if let Some(cff_table_data) = ttf.read_table(&scope, tag::CFF)? {
+    if let Some(cff_table_data) = ttf.read_table(scope, tag::CFF)? {
         println!();
         dump_cff_table(cff_table_data)?;
     }
     println!();
-    if let Some(name_table_data) = ttf.read_table(&scope, tag::NAME)? {
+    if let Some(name_table_data) = ttf.read_table(scope, tag::NAME)? {
         let name_table = name_table_data.read::<NameTable>()?;
         dump_name_table(&name_table)?;
     }
@@ -180,7 +180,7 @@ fn dump_woff(woff: &WoffFont<'_>, tag: Option<Tag>) -> Result<(), BoxError> {
             entry.comp_length,
             entry.orig_length
         );
-        let _table = entry.read_table(&scope)?;
+        let _table = entry.read_table(scope)?;
     }
 
     let metadata = woff.extended_metadata()?;
@@ -251,11 +251,11 @@ fn dump_woff2<'a>(
             .ok_or(ParseError::BadValue)?;
         let loca = loca_entry.read_table(&woff.table_data_block_scope())?;
         let loca = loca.scope().read_dep::<Woff2LocaTable>((
-            &loca_entry,
+            loca_entry,
             usize::from(maxp.num_glyphs),
             head.index_to_loc_format,
         ))?;
-        let glyf = table.scope().read_dep::<Woff2GlyfTable>((&entry, &loca))?;
+        let glyf = table.scope().read_dep::<Woff2GlyfTable>((entry, &loca))?;
 
         println!("Read glyf table with {} glyphs:", glyf.records.len());
         for glyph in glyf.records {
@@ -284,11 +284,11 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
             .offset_length(offset, length)?
             .data();
         let name = match (platform, encoding, language) {
-            (0, _, _) => decode(&UTF_16BE, name_data),
-            (1, 0, _) => decode(&MACINTOSH, name_data),
-            (3, 0, _) => decode(&UTF_16BE, name_data),
-            (3, 1, _) => decode(&UTF_16BE, name_data),
-            (3, 10, _) => decode(&UTF_16BE, name_data),
+            (0, _, _) => decode(UTF_16BE, name_data),
+            (1, 0, _) => decode(MACINTOSH, name_data),
+            (3, 0, _) => decode(UTF_16BE, name_data),
+            (3, 1, _) => decode(UTF_16BE, name_data),
+            (3, 10, _) => decode(UTF_16BE, name_data),
             _ => format!(
                 "(unknown platform={} encoding={} language={})",
                 platform, encoding, language
@@ -561,7 +561,7 @@ fn print_glyph_names(provider: &impl FontTableProvider) -> Result<(), ParseError
 
     let cmap_subtable = cmap
         .as_ref()
-        .and_then(|cmap| read_cmap_subtable(&cmap).ok())
+        .and_then(|cmap| read_cmap_subtable(cmap).ok())
         .and_then(convert::identity);
 
     let names = GlyphNames::new(&cmap_subtable, post_data);
@@ -580,11 +580,7 @@ fn print_cmap_encodings(provider: &impl FontTableProvider) -> Result<(), ParseEr
 
     println!("cmap encodings:");
     for record in cmap.encoding_records() {
-        print!(
-            " - {:?} {:?} ",
-            PlatformId(record.platform_id),
-            EncodingId(record.encoding_id)
-        );
+        print!(" - {:?} {:?} ", record.platform_id, record.encoding_id);
         if let Ok(subtable) = cmap
             .scope
             .offset(usize::try_from(record.offset)?)
