@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::{env, process};
 
 use allsorts_tools::cli::*;
-use allsorts_tools::{bitmaps, dump, has_table, shape, subset, svg, validate, BoxError};
+use allsorts_tools::{bitmaps, cmap, dump, has_table, shape, subset, svg, validate, BoxError};
 use gumdrop::Options;
 
 fn main() {
@@ -29,6 +29,7 @@ fn allsorts_main() -> Result<i32, BoxError> {
 
     match cli.command {
         Some(Command::Bitmaps(opts)) => bitmaps::main(opts),
+        Some(Command::Cmap(opts)) => cmap::main(opts),
         Some(Command::Dump(opts)) => dump::main(opts),
         Some(Command::HasTable(opts)) => has_table::main(opts),
         Some(Command::Shape(opts)) => shape::main(opts),

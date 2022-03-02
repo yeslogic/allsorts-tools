@@ -32,6 +32,7 @@ not rely on them for production workflows.
 Available tools:
 
 * `bitmaps` — dump bitmaps from bitmap fonts
+* `cmap` — print character to glyph mappings
 * `dump` — dump font information
 * `has-table` — check if a font has a particular table
 * `shape` — apply shaping to glyphs from a font
@@ -71,6 +72,43 @@ The format is `{ppem_x}x{ppem_y}@{bit_depth}`, the files are named
 #### Example
 
     allsorts bitmaps -o noto-color-emoji NotoColorEmoji.ttf
+
+### `cmap`
+
+The `cmap` tool chooses a preferred `cmap` sub-table and dumps the character to
+glyph index entries. If the encoding of the table is Unicode then the characters
+are printed along with the code point, otherwise just the numeric value of the
+character is printed.
+
+`-f`, `--font` specifies the path to the font file.
+
+`-i`, `--index` is index of the font to dump (for TTC, WOFF2) (default: 0).
+
+#### Example
+
+    $ allsorts cmap --font profontn.otb
+    cmap sub-table encoding: Unicode
+    '' U+0000 -> 0
+    '' U+0001 -> 1
+    '' U+0002 -> 2
+    ⋮
+    '?' U+003F -> 63
+    '@' U+0040 -> 64
+    'A' U+0041 -> 65
+    'B' U+0042 -> 66
+    ⋮
+    '»' U+00BB -> 187
+    '¼' U+00BC -> 188
+    '½' U+00BD -> 189
+    '¾' U+00BE -> 190
+    '¿' U+00BF -> 191
+    'À' U+00C0 -> 192
+    'Á' U+00C1 -> 193
+    'Â' U+00C2 -> 194
+    'Ã' U+00C3 -> 195
+    'Ä' U+00C4 -> 196
+    ⋮
+
 
 ### `dump`
 
