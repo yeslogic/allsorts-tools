@@ -16,6 +16,9 @@ pub enum Command {
     #[options(help = "dump bitmaps for supplied text")]
     Bitmaps(BitmapOpts),
 
+    #[options(help = "dump the character map")]
+    Cmap(CmapOpts),
+
     #[options(help = "dump font information")]
     Dump(DumpOpts),
 
@@ -58,6 +61,22 @@ pub struct BitmapOpts {
 
     #[options(free, required, help = "text to extract bitmaps for")]
     pub text: String,
+}
+
+#[derive(Debug, Options)]
+pub struct CmapOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(required, help = "path to font file", meta = "PATH")]
+    pub font: String,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
 }
 
 #[derive(Debug, Options)]

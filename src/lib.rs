@@ -1,5 +1,6 @@
 pub mod bitmaps;
 pub mod cli;
+pub mod cmap;
 pub mod dump;
 mod glyph;
 pub mod has_table;
