@@ -32,6 +32,7 @@ type Tag = u32;
 struct Flags {
     encodings: bool,
     glyphs_names: bool,
+    name: bool,
 }
 
 pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
@@ -73,12 +74,13 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
                     dump_ttc(&table_provider, &font_file.scope, ttc, table, flags)?
                 }
             },
-            FontData::Woff(woff_file) => dump_woff(woff_file, table)?,
+            FontData::Woff(woff_file) => dump_woff(woff_file, table, flags)?,
             FontData::Woff2(woff_file) => dump_woff2(
                 woff_file.table_data_block_scope(),
                 woff_file,
                 table,
                 opts.index,
+                flags,
             )?,
         }
     }
@@ -141,9 +143,11 @@ fn dump_ttf<'a>(
         dump_cff_table(cff_table_data)?;
     }
     println!();
-    if let Some(name_table_data) = ttf.read_table(scope, tag::NAME)? {
-        let name_table = name_table_data.read::<NameTable>()?;
-        dump_name_table(&name_table)?;
+    if flags.name {
+        if let Some(name_table_data) = ttf.read_table(scope, tag::NAME)? {
+            let name_table = name_table_data.read::<NameTable>()?;
+            dump_name_table(&name_table)?;
+        }
     }
     if flags.encodings {
         print_cmap_encodings(provider)?;
@@ -155,7 +159,7 @@ fn dump_ttf<'a>(
     Ok(())
 }
 
-fn dump_woff(woff: &WoffFont<'_>, tag: Option<Tag>) -> Result<(), BoxError> {
+fn dump_woff(woff: &WoffFont<'_>, tag: Option<Tag>, flags: Flags) -> Result<(), BoxError> {
     let scope = &woff.scope;
     if let Some(tag) = tag {
         if let Some(entry) = woff.table_directory.iter().find(|entry| entry.tag == tag) {
@@ -189,14 +193,16 @@ fn dump_woff(woff: &WoffFont<'_>, tag: Option<Tag>) -> Result<(), BoxError> {
     }
 
     println!();
-    if let Some(entry) = woff
-        .table_directory
-        .iter()
-        .find(|entry| entry.tag == tag::NAME)
-    {
-        let table = entry.read_table(&woff.scope)?;
-        let name_table = table.scope().read::<NameTable>()?;
-        dump_name_table(&name_table)?;
+    if flags.name {
+        if let Some(entry) = woff
+            .table_directory
+            .iter()
+            .find(|entry| entry.tag == tag::NAME)
+        {
+            let table = entry.read_table(&woff.scope)?;
+            let name_table = table.scope().read::<NameTable>()?;
+            dump_name_table(&name_table)?;
+        }
     }
 
     Ok(())
@@ -207,6 +213,7 @@ fn dump_woff2<'a>(
     woff: &Woff2Font<'a>,
     tag: Option<Tag>,
     index: usize,
+    flags: Flags,
 ) -> Result<(), BoxError> {
     if let Some(tag) = tag {
         let table = woff.read_table(tag, index)?;
@@ -263,10 +270,12 @@ fn dump_woff2<'a>(
         }
     }
 
-    if let Some(table) = woff.read_table(tag::NAME, index)? {
-        println!();
-        let name_table = table.scope().read::<NameTable>()?;
-        dump_name_table(&name_table)?;
+    if flags.name {
+        if let Some(table) = woff.read_table(tag::NAME, index)? {
+            println!();
+            let name_table = table.scope().read::<NameTable>()?;
+            dump_name_table(&name_table)?;
+        }
     }
 
     Ok(())
@@ -607,6 +616,7 @@ impl From<&DumpOpts> for Flags {
         Flags {
             encodings: opts.encodings,
             glyphs_names: opts.glyph_names,
+            name: opts.name,
         }
     }
 }

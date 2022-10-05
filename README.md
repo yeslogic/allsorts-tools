@@ -114,8 +114,9 @@ character is printed.
 
 The `dump` tool prints or extracts information from a font file.
 
-`allsorts dump path/to/font` prints out information about the font and meta
-data contained in the `name` table.
+`allsorts dump path/to/font` prints out information about the font.
+
+`--name` includes the meta data contained in the `name` table in the output.
 
 `-c` can be used to print information about a CFF font or table not
 wrapped in a TrueType or OpenType container.
