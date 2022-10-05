@@ -112,20 +112,20 @@ character is printed.
 
 ### `dump`
 
-The `dump` tool prints or extract information from a font file.
+The `dump` tool prints or extracts information from a font file.
 
 `allsorts dump path/to/font` prints out information about the font and meta
 data contained in the `name` table.
 
-`-c` option can be used to print information about a CFF font or table not
+`-c` can be used to print information about a CFF font or table not
 wrapped in a TrueType or OpenType container.
 
-`-t` option extracts the named table from the supplied font. The output should be
+`-t` extracts the named table from the supplied font. The output should be
 redirected to a file. E.g. `allsorts dump -t glyf > glyf.bin`
 
 `-g` prints information about a specific glyph in a font.
 
-`-l` option prints out all offsets in the `loca` table in the font.
+`-l` prints out all offsets in the `loca` table in the font.
 
 #### Example
 
@@ -155,7 +155,7 @@ redirected to a file. E.g. `allsorts dump -t glyf > glyf.bin`
 
 The `has-table` tool checks if the supplied font file contains the table passed
 via the `-t` argument.  If the font contains the table it exits with status
-success (0), if the font doesn't not contain the table it exits with status 1.
+success (0), if the font does not contain the table it exits with status 1.
 The `-p` option makes the tool print the path to the font if it contains the
 table.
 
