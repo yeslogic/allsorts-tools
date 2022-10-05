@@ -119,15 +119,17 @@ impl SVGWriter {
         w.write_attribute("version", "1.1");
         w.write_attribute("xmlns", "http://www.w3.org/2000/svg");
         w.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-        let x_max = self.transform.extract_scale().x() * x_max;
+        let width = self.transform.extract_scale().x() * x_max;
         let ascender = self.transform.extract_scale().y() * f32::from(ascender);
         let descender = self.transform.extract_scale().y() * f32::from(descender);
         let height = ascender - descender;
+        let is_flipped = self.transform.m22() < 0.0;
+        let min_y = if is_flipped { -ascender } else { descender };
         let view_box = format!(
             "{} {} {} {}",
             0,
-            descender.round(),
-            x_max.round(),
+            min_y.round(),
+            width.round(),
             height.round()
         );
         w.write_attribute("viewBox", &view_box);
