@@ -106,6 +106,9 @@ pub struct DumpOpts {
     #[options(help = "include glyph names in output", no_short)]
     pub glyph_names: bool,
 
+    #[options(help = "include strings from the name table in output", no_short)]
+    pub name: bool,
+
     #[options(help = "print the head table", no_short)]
     pub head: bool,
 
