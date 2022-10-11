@@ -25,17 +25,17 @@ pub enum Command {
     #[options(help = "check if a font has a particular table")]
     HasTable(HasTableOpts),
 
-    #[options(help = "parse the supplied font, reporting any failures")]
-    Validate(ValidateOpts),
+    #[options(help = "apply shaping to glyphs from a font")]
+    Shape(ShapeOpts),
 
     #[options(help = "subset a font")]
     Subset(SubsetOpts),
 
-    #[options(help = "apply shaping to glyphs from a font")]
-    Shape(ShapeOpts),
-
     #[options(help = "output an SVG rendition of the supplied text")]
     Svg(SvgOpts),
+
+    #[options(help = "parse the supplied font, reporting any failures")]
+    Validate(ValidateOpts),
 }
 
 #[derive(Debug, Options)]
@@ -148,40 +148,6 @@ pub struct HasTableOpts {
 }
 
 #[derive(Debug, Options)]
-pub struct ValidateOpts {
-    #[options(help = "print help message")]
-    pub help: bool,
-
-    #[options(free, required, help = "path to font")]
-    pub font: String,
-}
-
-#[derive(Debug, Options)]
-pub struct SubsetOpts {
-    #[options(help = "print help message")]
-    pub help: bool,
-
-    #[options(help = "subset the font to include glyphs from TEXT", meta = "TEXT")]
-    pub text: Option<String>,
-
-    #[options(help = "include all glyphs in the subset font")]
-    pub all: bool,
-
-    #[options(
-        help = "index of the font to dump (for TTC, WOFF2)",
-        meta = "INDEX",
-        default = "0"
-    )]
-    pub index: usize,
-
-    #[options(free, required, help = "path to source font")]
-    pub input: String,
-
-    #[options(free, required, help = "path to destination font")]
-    pub output: String,
-}
-
-#[derive(Debug, Options)]
 #[options(help = "E.g. shape -f some.ttf -s deva -l HIN 'Some text'")]
 pub struct ShapeOpts {
     #[options(help = "print help message")]
@@ -211,6 +177,31 @@ pub struct ShapeOpts {
 }
 
 #[derive(Debug, Options)]
+pub struct SubsetOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(help = "subset the font to include glyphs from TEXT", meta = "TEXT")]
+    pub text: Option<String>,
+
+    #[options(help = "include all glyphs in the subset font")]
+    pub all: bool,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
+    #[options(free, required, help = "path to source font")]
+    pub input: String,
+
+    #[options(free, required, help = "path to destination font")]
+    pub output: String,
+}
+
+#[derive(Debug, Options)]
 #[options(help = "Output an SVG in the format expected by the unicode text-rendering tests")]
 pub struct SvgOpts {
     #[options(help = "print help message")]
@@ -233,4 +224,13 @@ pub struct SvgOpts {
 
     #[options(help = "flip output (rotate 180deg)", no_short)]
     pub flip: bool,
+}
+
+#[derive(Debug, Options)]
+pub struct ValidateOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(free, required, help = "path to font")]
+    pub font: String,
 }
