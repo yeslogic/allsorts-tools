@@ -1,12 +1,16 @@
 use std::collections::HashMap;
 
+use allsorts::cff::CFF;
 use allsorts::context::Glyph;
+use allsorts::error::ParseError;
 use allsorts::glyph_position::{GlyphLayout, GlyphPosition, TextDirection};
 use allsorts::gpos::Info;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::line_segment::LineSegment2F;
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::{vec2f, Vector2F};
+use allsorts::post::PostTable;
+use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::FontTableProvider;
 use allsorts::Font;
 use xmlwriter::XmlWriter;
@@ -20,6 +24,43 @@ struct Symbol {
 
 pub trait GlyphName {
     fn gid_to_glyph_name(&self, gid: u16) -> Option<String>;
+}
+
+pub struct GlyfPost<'a> {
+    pub glyf: GlyfTable<'a>,
+    pub post: Option<PostTable<'a>>,
+}
+
+impl<'a> GlyphName for CFF<'a> {
+    fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
+        let font = self.fonts.first()?;
+        if font.is_cid_keyed() {
+            return None;
+        }
+        let sid = font.charset.id_for_glyph(glyph_id)?;
+        self.read_string(sid).ok()
+    }
+}
+
+impl<'a> GlyphName for GlyfPost<'a> {
+    fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
+        self.post
+            .as_ref()
+            .and_then(|post| post.glyph_name(glyph_id).ok().flatten())
+            .map(|s| s.to_string())
+    }
+}
+
+impl<'a> OutlineBuilder for GlyfPost<'a> {
+    type Error = ParseError;
+
+    fn visit<V: OutlineSink>(
+        &mut self,
+        glyph_index: u16,
+        visitor: &mut V,
+    ) -> Result<(), Self::Error> {
+        self.glyf.visit(glyph_index, visitor)
+    }
 }
 
 pub struct SVGWriter {
