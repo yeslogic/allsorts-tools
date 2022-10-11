@@ -11,12 +11,15 @@ use allsorts::tables::FontTableProvider;
 use allsorts::Font;
 use xmlwriter::XmlWriter;
 
-use super::GlyphName;
 use crate::BoxError;
 
 struct Symbol {
     glyph_name: String,
     path: String,
+}
+
+pub trait GlyphName {
+    fn gid_to_glyph_name(&self, gid: u16) -> Option<String>;
 }
 
 pub struct SVGWriter {
