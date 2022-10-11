@@ -4,7 +4,6 @@ use allsorts::error::ParseError;
 use allsorts::font::{GlyphTableFlags, MatchingPresentation};
 use allsorts::font_data::FontData;
 use allsorts::gsub::{FeatureMask, Features};
-use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
@@ -15,15 +14,10 @@ use allsorts::{tag, Font};
 
 use crate::cli::SvgOpts;
 use crate::script;
-use crate::writer::{GlyphName, SVGWriter};
+use crate::writer::{GlyfPost, SVGWriter};
 use crate::BoxError;
 
 const FONT_SIZE: f32 = 1000.0;
-
-struct GlyfPost<'a> {
-    glyf: GlyfTable<'a>,
-    post: Option<PostTable<'a>>,
-}
 
 pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     // Read and parse the font
@@ -114,37 +108,5 @@ fn script_and_lang_from_testcase(testcase: &str) -> (u32, u32) {
         )
     } else {
         (tag::LATN, tag::from_string("ENG ").unwrap())
-    }
-}
-
-impl<'a> GlyphName for CFF<'a> {
-    fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
-        let font = self.fonts.first()?;
-        if font.is_cid_keyed() {
-            return None;
-        }
-        let sid = font.charset.id_for_glyph(glyph_id)?;
-        self.read_string(sid).ok()
-    }
-}
-
-impl<'a> GlyphName for GlyfPost<'a> {
-    fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
-        self.post
-            .as_ref()
-            .and_then(|post| post.glyph_name(glyph_id).ok().flatten())
-            .map(|s| s.to_string())
-    }
-}
-
-impl<'a> OutlineBuilder for GlyfPost<'a> {
-    type Error = ParseError;
-
-    fn visit<V: OutlineSink>(
-        &mut self,
-        glyph_index: u16,
-        visitor: &mut V,
-    ) -> Result<(), Self::Error> {
-        self.glyf.visit(glyph_index, visitor)
     }
 }
