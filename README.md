@@ -170,16 +170,6 @@ is found the path to the font is printed.
 
     find . -regextype posix-extended -type f -iregex '.*\.(ttf|otf|otc)$' -exec allsorts has-table -t EBLC -p {} \;
 
-### `subset`
-
-The `subset` tool takes a source font and some text and writes a new version of
-the source font only containing the glyphs required for the supplied text.
-
-#### Example
-
-    $ allsorts subset -t 'This a subsetting test' NotoSansJP-Regular.otf noto-subset.otf
-    Number of glyphs in new font: 13
-
 ### `shape`
 
 The `shape` tool shapes the supplied text according to the supplied font, language, and
@@ -189,6 +179,16 @@ script. It prints out the glyphs before and after shaping.
 
     $ shape -f fonts/devanagari/AnnapurnaSIL-Regular.ttf -s deva -l HIN 'शब्दों और वाक्यों की तरह'
     # output omitted
+
+### `subset`
+
+The `subset` tool takes a source font and some text and writes a new version of
+the source font only containing the glyphs required for the supplied text.
+
+#### Example
+
+    $ allsorts subset -t 'This a subsetting test' NotoSansJP-Regular.otf noto-subset.otf
+    Number of glyphs in new font: 13
 
 ### `svg`
 
