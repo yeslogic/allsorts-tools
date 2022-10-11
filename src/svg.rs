@@ -1,5 +1,3 @@
-mod writer;
-
 use allsorts::binary::read::ReadScope;
 use allsorts::cff::CFF;
 use allsorts::error::ParseError;
@@ -17,14 +15,10 @@ use allsorts::{tag, Font};
 
 use crate::cli::SvgOpts;
 use crate::script;
-use crate::svg::writer::SVGWriter;
+use crate::writer::{GlyphName, SVGWriter};
 use crate::BoxError;
 
 const FONT_SIZE: f32 = 1000.0;
-
-pub trait GlyphName {
-    fn gid_to_glyph_name(&self, gid: u16) -> Option<String>;
-}
 
 struct GlyfPost<'a> {
     glyf: GlyfTable<'a>,

@@ -9,6 +9,7 @@ pub mod shape;
 pub mod subset;
 pub mod svg;
 pub mod validate;
+mod writer;
 
 use std::error::Error;
 use std::fmt;
