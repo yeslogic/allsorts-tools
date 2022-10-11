@@ -31,14 +31,14 @@ not rely on them for production workflows.
 
 Available tools:
 
-* `bitmaps` — dump bitmaps from bitmap fonts
-* `cmap` — print character to glyph mappings
-* `dump` — dump font information
-* `has-table` — check if a font has a particular table
-* `shape` — apply shaping to glyphs from a font
-* `subset` — subset a font
-* `svg` — generate SVGs from glyphs
-* `validate` — parse the supplied font, reporting any failures
+* [`bitmaps`](#bitmaps) — dump bitmaps from bitmap fonts
+* [`cmap`](#cmap) — print character to glyph mappings
+* [`dump`](#dump) — dump font information
+* [`has-table`](#has-table) — check if a font has a particular table
+* [`shape`](#shape) — apply shaping to glyphs from a font
+* [`subset`](#subset) — subset a font
+* [`svg`](#svg) — generate SVGs from glyphs
+* [`validate`](#validate) — parse the supplied font, reporting any failures
 
 ### `bitmaps`
 
