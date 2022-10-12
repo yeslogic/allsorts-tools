@@ -3,7 +3,7 @@ use allsorts::cff::CFF;
 use allsorts::error::ParseError;
 use allsorts::font::{Font, GlyphTableFlags, MatchingPresentation};
 use allsorts::font_data::FontData;
-use allsorts::gsub::{FeatureInfo, FeatureMask, Features};
+use allsorts::gsub::{FeatureInfo, FeatureMask, Features, GlyphOrigin, RawGlyph};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
@@ -11,6 +11,7 @@ use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::{FontTableProvider, SfntVersion};
 use allsorts::tag;
+use allsorts::tinyvec::tiny_vec;
 
 use crate::cli::ViewOpts;
 use crate::script;
@@ -25,14 +26,13 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
         .lang
         .map(|s| tag::from_string(&s).expect("invalid language tag"));
 
-    let text = match (opts.text, opts.codepoints) {
-        (Some(s), None) => s,
-        (None, Some(s)) => parse_codepoints(s.as_str()),
-        (Some(_), Some(_)) | (None, None) => {
-            eprintln!("required option: --text OR --codepoints");
+    match (&opts.text, &opts.codepoints, &opts.indices) {
+        (Some(_), None, None) | (None, Some(_), None) | (None, None, Some(_)) => {}
+        (_, _, _) => {
+            eprintln!("required option: --text OR --codepoints OR --indices");
             return Ok(1);
         }
-    };
+    }
 
     let features = match opts.features {
         Some(features) => parse_features(&features),
@@ -50,7 +50,17 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
             return Ok(1);
         }
     };
-    let glyphs = font.map_glyphs(&text, script, MatchingPresentation::NotRequired);
+
+    let glyphs = if let Some(text) = opts.text {
+        font.map_glyphs(&text, script, MatchingPresentation::NotRequired)
+    } else if let Some(codepoints) = opts.codepoints {
+        let text = parse_codepoints(&codepoints);
+        font.map_glyphs(&text, script, MatchingPresentation::NotRequired)
+    } else if let Some(indices) = opts.indices {
+        parse_glyph_indices(&indices)
+    } else {
+        panic!("expected --text OR --codepoints OR --indices");
+    };
 
     let infos = font
         .shape(glyphs, script, lang, &features, true)
@@ -109,6 +119,35 @@ fn hex_string_to_char(hex: &str) -> char {
     let i = u32::from_str_radix(hex, 16)
         .expect(format!("failed to parse hex string '{}'", hex).as_str());
     std::char::from_u32(i).unwrap_or('\u{FFFD}')
+}
+
+fn parse_glyph_indices(glyph_indices: &str) -> Vec<RawGlyph<()>> {
+    glyph_indices
+        .split(',')
+        .map(str::trim)
+        .map(string_to_u16)
+        .map(make_raw_glyph)
+        .collect()
+}
+
+fn string_to_u16(s: &str) -> u16 {
+    u16::from_str_radix(s, 10).expect(format!("failed to parse u16 string '{}'", s).as_str())
+}
+
+fn make_raw_glyph(glyph_index: u16) -> RawGlyph<()> {
+    RawGlyph {
+        unicodes: tiny_vec![],
+        glyph_index,
+        liga_component_pos: 0,
+        glyph_origin: GlyphOrigin::Char('x'),
+        small_caps: false,
+        multi_subst_dup: false,
+        is_vert_alt: false,
+        fake_bold: false,
+        fake_italic: false,
+        variation: None,
+        extra_data: (),
+    }
 }
 
 fn parse_features(features: &str) -> Features {

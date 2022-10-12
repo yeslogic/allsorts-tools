@@ -262,6 +262,12 @@ pub struct ViewOpts {
     pub codepoints: Option<String>,
 
     #[options(
+        help = "comma-separated list of glyph indices to render",
+        meta = "GLYPH_INDICES"
+    )]
+    pub indices: Option<String>,
+
+    #[options(
         help = "comma-separated list of OpenType features to enable (note: only enables these features)",
         meta = "FEATURES"
     )]

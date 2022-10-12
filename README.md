@@ -252,6 +252,14 @@ supplied font, language, and script. Then, it generates an SVG of the glyphs.
     $ view -f fonts/devanagari/NotoSerifDevanagari-Regular.ttf -s deva -c '916,93f'
     # output omitted
 
+#### Example Using Glyph Indices (and Features)
+
+In this example, the OpenType `pres` feature is enabled, which allows glyph 30
+to be replaced by its special presentation form (glyph 547).
+
+    $ view -f fonts/devanagari/NotoSerifDevanagari-Regular.ttf -s deva --features pres -i '30,54'
+    # output omitted
+
 ## Building and Installing
 
 ### From Source
