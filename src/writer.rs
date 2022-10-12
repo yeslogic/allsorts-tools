@@ -64,16 +64,16 @@ impl<'a> OutlineBuilder for GlyfPost<'a> {
 }
 
 pub struct SVGWriter {
-    testcase: String,
+    id_prefix: Option<String>,
     transform: Matrix2x2F,
     symbols: Vec<Symbol>,
     usage: Vec<(usize, Vector2F)>,
 }
 
 impl SVGWriter {
-    pub fn new(testcase: String, transform: Matrix2x2F) -> Self {
+    pub fn new(id_prefix: Option<String>, transform: Matrix2x2F) -> Self {
         SVGWriter {
-            testcase,
+            id_prefix,
             transform,
             symbols: Vec::new(),
             usage: Vec::new(),
@@ -181,7 +181,7 @@ impl SVGWriter {
         // Write symbols
         for symbol in &self.symbols {
             w.start_element("symbol");
-            let id = format!("{}.{}", self.testcase, symbol.glyph_name);
+            let id = SVGWriter::format_id(&self.id_prefix, &symbol.glyph_name);
             w.write_attribute("id", &id);
             w.write_attribute("overflow", "visible");
             w.start_element("path");
@@ -194,7 +194,8 @@ impl SVGWriter {
         for (symbol_index, point) in self.usage {
             w.start_element("use");
             let symbol = &self.symbols[symbol_index];
-            let href = format!("#{}.{}", self.testcase, symbol.glyph_name);
+            let id = SVGWriter::format_id(&self.id_prefix, &symbol.glyph_name);
+            let href = format!("#{}", id);
             w.write_attribute("xlink:href", &href);
             w.write_attribute("x", &point.x().round());
             w.write_attribute("y", &point.y().round());
@@ -206,6 +207,13 @@ impl SVGWriter {
 
     fn current_path(&mut self) -> &mut String {
         &mut self.symbols.last_mut().unwrap().path
+    }
+
+    fn format_id(id_prefix: &Option<String>, glyph_name: &str) -> String {
+        match id_prefix {
+            Some(id_prefix) => format!("{}.{}", id_prefix, glyph_name),
+            None => glyph_name.to_owned(),
+        }
     }
 }
 
