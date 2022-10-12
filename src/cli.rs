@@ -31,7 +31,9 @@ pub enum Command {
     #[options(help = "subset a font")]
     Subset(SubsetOpts),
 
-    #[options(help = "output an SVG rendition of the supplied text")]
+    #[options(
+        help = "output an SVG rendition of the supplied text (for unicode text-rendering tests)"
+    )]
     Svg(SvgOpts),
 
     #[options(help = "parse the supplied font, reporting any failures")]
