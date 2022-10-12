@@ -36,6 +36,9 @@ pub enum Command {
 
     #[options(help = "parse the supplied font, reporting any failures")]
     Validate(ValidateOpts),
+
+    #[options(help = "output an SVG rendition of the supplied text")]
+    View(ViewOpts),
 }
 
 #[derive(Debug, Options)]
@@ -233,4 +236,34 @@ pub struct ValidateOpts {
 
     #[options(free, required, help = "path to font")]
     pub font: String,
+}
+
+#[derive(Debug, Options)]
+pub struct ViewOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(required, help = "path to font file", meta = "PATH")]
+    pub font: String,
+
+    #[options(required, help = "script to shape", meta = "SCRIPT")]
+    pub script: String,
+
+    #[options(help = "language to shape", meta = "LANG")]
+    pub lang: Option<String>,
+
+    #[options(help = "text to render")]
+    pub text: Option<String>,
+
+    #[options(
+        help = "comma-separated list of codepoints (as hexadecimal numbers) to render",
+        meta = "CODEPOINTS"
+    )]
+    pub codepoints: Option<String>,
+
+    #[options(
+        help = "comma-separated list of OpenType features to enable (note: only enables these features)",
+        meta = "FEATURES"
+    )]
+    pub features: Option<String>,
 }

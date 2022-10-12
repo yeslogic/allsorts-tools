@@ -39,6 +39,7 @@ Available tools:
 * [`subset`](#subset) — subset a font
 * [`svg`](#svg) — generate SVGs from glyphs
 * [`validate`](#validate) — parse the supplied font, reporting any failures
+* [`view`](#view) - generate SVGs from glyphs
 
 ### `bitmaps`
 
@@ -235,6 +236,21 @@ large repertoire of real world fonts.
 #### Bulk Validation Example
 
     $ fd '\.(ttf|otf|ttc)$' /usr/share/fonts | sort | parallel --bar allsorts validate {}
+
+### `view`
+
+The `view` tool shapes the supplied text or list of codepoints according to the
+supplied font, language, and script. Then, it generates an SVG of the glyphs.
+
+#### Example Using Text
+
+    $ view -f fonts/devanagari/NotoSerifDevanagari-Regular.ttf -s deva -t 'खि'
+    # output omitted
+
+#### Example Using Codepoints
+
+    $ view -f fonts/devanagari/NotoSerifDevanagari-Regular.ttf -s deva -c '916,93f'
+    # output omitted
 
 ## Building and Installing
 
