@@ -2,7 +2,9 @@ use std::ffi::OsStr;
 use std::{env, process};
 
 use allsorts_tools::cli::*;
-use allsorts_tools::{bitmaps, cmap, dump, has_table, shape, subset, svg, validate, BoxError};
+use allsorts_tools::{
+    bitmaps, cmap, dump, has_table, shape, subset, svg, validate, view, BoxError,
+};
 use gumdrop::Options;
 
 fn main() {
@@ -36,6 +38,7 @@ fn allsorts_main() -> Result<i32, BoxError> {
         Some(Command::Subset(opts)) => subset::main(opts),
         Some(Command::Svg(opts)) => svg::main(opts),
         Some(Command::Validate(opts)) => validate::main(opts),
+        Some(Command::View(opts)) => view::main(opts),
         None => usage(),
     }
 }
