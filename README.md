@@ -35,6 +35,7 @@ Available tools:
 * [`cmap`](#cmap) — print character to glyph mappings
 * [`dump`](#dump) — dump font information
 * [`has-table`](#has-table) — check if a font has a particular table
+* [`layout-features`](#layout-features) - print a list of a font's GSUB and GPOS features
 * [`shape`](#shape) — apply shaping to glyphs from a font
 * [`subset`](#subset) — subset a font
 * [`validate`](#validate) — parse the supplied font, reporting any failures
@@ -169,6 +170,26 @@ In this example, we search the current directory for files ending in `ttf`,
 is found the path to the font is printed.
 
     find . -regextype posix-extended -type f -iregex '.*\.(ttf|otf|otc)$' -exec allsorts has-table -t EBLC -p {} \;
+
+### `layout-features`
+
+Prints an indented list of a font's GSUB and GPOS features.
+
+#### Example
+
+    $ layout-features fonts/devanagari/AnnapurnaSIL-Regular.ttf
+    Table: GSUB
+      Script: DFLT
+        Language: default
+          Feature: aalt
+            Lookups: 56
+          Feature: abvs
+            Lookups: 27,28,29,30
+          Feature: akhn
+            Lookups: 4
+          Feature: blwf
+            Lookups: 9
+    # additional output omitted
 
 ### `shape`
 

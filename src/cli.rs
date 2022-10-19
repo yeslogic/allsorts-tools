@@ -25,6 +25,9 @@ pub enum Command {
     #[options(help = "check if a font has a particular table")]
     HasTable(HasTableOpts),
 
+    #[options(help = "print a list of a font's GSUB and GPOS features")]
+    LayoutFeatures(LayoutFeaturesOpts),
+
     #[options(help = "apply shaping to glyphs from a font")]
     Shape(ShapeOpts),
 
@@ -150,6 +153,22 @@ pub struct HasTableOpts {
 
     #[options(free, required, help = "paths of fonts to check")]
     pub fonts: Vec<OsString>,
+}
+
+#[derive(Debug, Options)]
+pub struct LayoutFeaturesOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
+    #[options(free, required, help = "path to font file")]
+    pub font: String,
 }
 
 #[derive(Debug, Options)]
