@@ -21,15 +21,12 @@ pub fn main(opts: CmapOpts) -> Result<i32, BoxError> {
             return Ok(1);
         }
     };
-    let failed = dump_cmap(&mut font)?;
-    if failed {
-        Ok(1)
-    } else {
-        Ok(0)
-    }
+    dump_cmap(&mut font)?;
+
+    Ok(0)
 }
 
-fn dump_cmap<T: FontTableProvider>(font: &mut Font<T>) -> Result<bool, ParseError> {
+fn dump_cmap<T: FontTableProvider>(font: &mut Font<T>) -> Result<(), ParseError> {
     let cmap_subtable = ReadScope::new(font.cmap_subtable_data()).read::<CmapSubtable<'_>>()?;
     let encoding = font.cmap_subtable_encoding;
 
@@ -52,5 +49,5 @@ fn dump_cmap<T: FontTableProvider>(font: &mut Font<T>) -> Result<bool, ParseErro
         Encoding::Symbol | Encoding::AppleRoman | Encoding::Big5 => println!("{} -> {}", ch, gid),
     })?;
 
-    Ok(true)
+    Ok(())
 }
