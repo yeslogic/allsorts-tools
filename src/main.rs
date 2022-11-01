@@ -20,7 +20,7 @@ fn main() {
         Ok(code) if code != 0 => process::exit(code),
         Ok(_) => (),
         Err(err) => {
-            eprint!("Error: {}", err);
+            eprintln!("Error: {}", err);
             process::exit(1);
         }
     }
