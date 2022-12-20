@@ -17,9 +17,10 @@ use xmlwriter::XmlWriter;
 
 use crate::BoxError;
 
-struct Symbol {
+struct Symbol<'info> {
     glyph_name: String,
     path: String,
+    info: &'info Info,
 }
 
 pub trait GlyphName {
@@ -66,8 +67,12 @@ impl<'a> OutlineBuilder for GlyfPost<'a> {
 pub struct SVGWriter {
     id_prefix: Option<String>,
     transform: Matrix2x2F,
-    symbols: Vec<Symbol>,
     usage: Vec<(usize, Vector2F)>,
+}
+
+struct Symbols<'info> {
+    transform: Matrix2x2F,
+    symbols: Vec<Symbol<'info>>,
 }
 
 impl SVGWriter {
@@ -75,7 +80,6 @@ impl SVGWriter {
         SVGWriter {
             id_prefix,
             transform,
-            symbols: Vec::new(),
             usage: Vec::new(),
         }
     }
@@ -98,7 +102,7 @@ impl SVGWriter {
             TextDirection::LeftToRight => self.glyphs_to_svg_impl(builder, font, iter),
             TextDirection::RightToLeft => self.glyphs_to_svg_impl(builder, font, iter.rev()),
         }
-        .map_err(|err| format!("error buliding SVG: {}", err))?;
+        .map_err(|err| format!("error building SVG: {}", err))?;
         Ok(svg)
     }
 
@@ -116,10 +120,14 @@ impl SVGWriter {
         // Turn each glyph into an SVG...
         let mut x = 0.;
         let mut y = 0.;
-        let mut symbols = HashMap::new();
+        let mut symbols = Symbols {
+            transform: self.transform,
+            symbols: Vec::new(),
+        };
+        let mut symbol_map = HashMap::new();
         for (info, pos) in iter {
             let glyph_index = info.get_glyph_index();
-            if let Some(&symbol_index) = symbols.get(&glyph_index) {
+            if let Some(&symbol_index) = symbol_map.get(&glyph_index) {
                 self.use_glyph(
                     symbol_index,
                     x + pos.x_offset as f32,
@@ -129,9 +137,9 @@ impl SVGWriter {
                 let glyph_name = builder
                     .gid_to_glyph_name(glyph_index)
                     .unwrap_or_else(|| format!("gid{}", glyph_index));
-                let symbol_index = self.new_glyph(glyph_name);
-                symbols.insert(glyph_index, symbol_index);
-                builder.visit(glyph_index, &mut self)?;
+                let symbol_index = symbols.new_glyph(glyph_name, info);
+                symbol_map.insert(glyph_index, symbol_index);
+                builder.visit(glyph_index, &mut symbols)?;
                 self.use_glyph(
                     symbol_index,
                     x + pos.x_offset as f32,
@@ -142,13 +150,12 @@ impl SVGWriter {
             y += pos.vert_advance as f32;
         }
 
-        Ok(self.end(x, font.hhea_table.ascender, font.hhea_table.descender))
-    }
-
-    fn new_glyph(&mut self, glyph_name: String) -> usize {
-        let index = self.symbols.len();
-        self.symbols.push(Symbol::new(glyph_name));
-        index
+        Ok(self.end(
+            x,
+            font.hhea_table.ascender,
+            font.hhea_table.descender,
+            symbols,
+        ))
     }
 
     fn use_glyph(&mut self, symbol_index: usize, x: f32, y: f32) {
@@ -156,7 +163,7 @@ impl SVGWriter {
             .push((symbol_index, self.transform * vec2f(x, y)));
     }
 
-    fn end(self, x_max: f32, ascender: i16, descender: i16) -> String {
+    fn end(self, x_max: f32, ascender: i16, descender: i16, symbols: Symbols) -> String {
         let mut w = XmlWriter::new(xmlwriter::Options::default());
         w.write_declaration();
         w.start_element("svg");
@@ -179,9 +186,10 @@ impl SVGWriter {
         w.write_attribute("viewBox", &view_box);
 
         // Write symbols
-        for symbol in &self.symbols {
+        for symbol in &symbols.symbols {
             w.start_element("symbol");
             let id = SVGWriter::format_id(&self.id_prefix, &symbol.glyph_name);
+            // let class = SVGWriter::class(&symbol.glyph_name);
             w.write_attribute("id", &id);
             w.write_attribute("overflow", "visible");
             w.start_element("path");
@@ -193,7 +201,7 @@ impl SVGWriter {
         // Write use statements
         for (symbol_index, point) in self.usage {
             w.start_element("use");
-            let symbol = &self.symbols[symbol_index];
+            let symbol = &symbols.symbols[symbol_index];
             let id = SVGWriter::format_id(&self.id_prefix, &symbol.glyph_name);
             let href = format!("#{}", id);
             w.write_attribute("xlink:href", &href);
@@ -205,10 +213,6 @@ impl SVGWriter {
         w.end_document()
     }
 
-    fn current_path(&mut self) -> &mut String {
-        &mut self.symbols.last_mut().unwrap().path
-    }
-
     fn format_id(id_prefix: &Option<String>, glyph_name: &str) -> String {
         match id_prefix {
             Some(id_prefix) => format!("{}.{}", id_prefix, glyph_name),
@@ -217,16 +221,29 @@ impl SVGWriter {
     }
 }
 
-impl Symbol {
-    fn new(glyph_name: String) -> Self {
+impl<'info> Symbols<'info> {
+    fn new_glyph(&mut self, glyph_name: String, info: &'info Info) -> usize {
+        let index = self.symbols.len();
+        self.symbols.push(Symbol::new(glyph_name, info));
+        index
+    }
+
+    fn current_path(&mut self) -> &mut String {
+        &mut self.symbols.last_mut().unwrap().path
+    }
+}
+
+impl<'info> Symbol<'info> {
+    fn new(glyph_name: String, info: &'info Info) -> Self {
         Symbol {
             glyph_name,
             path: String::new(),
+            info,
         }
     }
 }
 
-impl OutlineSink for SVGWriter {
+impl<'info> OutlineSink for Symbols<'info> {
     fn move_to(&mut self, point: Vector2F) {
         let point = self.transform * point;
         self.current_path()
