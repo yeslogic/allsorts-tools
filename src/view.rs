@@ -15,7 +15,7 @@ use allsorts::tinyvec::tiny_vec;
 
 use crate::cli::ViewOpts;
 use crate::script;
-use crate::writer::{GlyfPost, SVGWriter};
+use crate::writer::{GlyfPost, SVGMode, SVGWriter};
 use crate::BoxError;
 
 const FONT_SIZE: f32 = 1000.0;
@@ -79,7 +79,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     {
         let cff_data = provider.read_table_data(tag::CFF)?;
         let mut cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
-        let writer = SVGWriter::new(None, transform);
+        let writer = SVGWriter::new(SVGMode::View, transform);
         writer.glyphs_to_svg(&mut cff, &mut font, &infos, direction)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
@@ -95,7 +95,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
         let mut glyf_post = GlyfPost { glyf, post };
-        let writer = SVGWriter::new(None, transform);
+        let writer = SVGWriter::new(SVGMode::View, transform);
         writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction)?
     } else {
         eprintln!("no glyf or CFF table");
