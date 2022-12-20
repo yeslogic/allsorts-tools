@@ -1,10 +1,12 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use allsorts::cff::CFF;
 use allsorts::context::Glyph;
 use allsorts::error::ParseError;
 use allsorts::glyph_position::{GlyphLayout, GlyphPosition, TextDirection};
-use allsorts::gpos::Info;
+use allsorts::gpos::{Info, Placement};
+use allsorts::gsub::GlyphOrigin;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::line_segment::LineSegment2F;
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
@@ -64,8 +66,18 @@ impl<'a> OutlineBuilder for GlyfPost<'a> {
     }
 }
 
+pub enum SVGMode {
+    /// SVGs are being generated to comply with the expected output of the
+    /// [Unicode text rendering tests](https://github.com/unicode-org/text-rendering-tests).
+    ///
+    /// The String is the testcase name to be used as a prefix on ids.
+    TextRenderingTests(String),
+    /// SVGs are being generated for human viewing
+    View,
+}
+
 pub struct SVGWriter {
-    id_prefix: Option<String>,
+    mode: SVGMode,
     transform: Matrix2x2F,
     usage: Vec<(usize, Vector2F)>,
 }
@@ -76,9 +88,9 @@ struct Symbols<'info> {
 }
 
 impl SVGWriter {
-    pub fn new(id_prefix: Option<String>, transform: Matrix2x2F) -> Self {
+    pub fn new(mode: SVGMode, transform: Matrix2x2F) -> Self {
         SVGWriter {
-            id_prefix,
+            mode,
             transform,
             usage: Vec::new(),
         }
@@ -188,9 +200,10 @@ impl SVGWriter {
         // Write symbols
         for symbol in &symbols.symbols {
             w.start_element("symbol");
-            let id = SVGWriter::format_id(&self.id_prefix, &symbol.glyph_name);
-            // let class = SVGWriter::class(&symbol.glyph_name);
-            w.write_attribute("id", &id);
+            w.write_attribute("id", &symbol.id(&self.mode));
+            for (key, value) in symbol.data(&self.mode) {
+                w.write_attribute(key, &value);
+            }
             w.write_attribute("overflow", "visible");
             w.start_element("path");
             w.write_attribute("d", &symbol.path);
@@ -202,22 +215,13 @@ impl SVGWriter {
         for (symbol_index, point) in self.usage {
             w.start_element("use");
             let symbol = &symbols.symbols[symbol_index];
-            let id = SVGWriter::format_id(&self.id_prefix, &symbol.glyph_name);
-            let href = format!("#{}", id);
-            w.write_attribute("xlink:href", &href);
+            w.write_attribute("xlink:href", &format!("#{}", symbol.id(&self.mode)));
             w.write_attribute("x", &point.x().round());
             w.write_attribute("y", &point.y().round());
             w.end_element();
         }
 
         w.end_document()
-    }
-
-    fn format_id(id_prefix: &Option<String>, glyph_name: &str) -> String {
-        match id_prefix {
-            Some(id_prefix) => format!("{}.{}", id_prefix, glyph_name),
-            None => glyph_name.to_owned(),
-        }
     }
 }
 
@@ -239,6 +243,59 @@ impl<'info> Symbol<'info> {
             glyph_name,
             path: String::new(),
             info,
+        }
+    }
+
+    fn id(&self, mode: &SVGMode) -> Cow<'_, str> {
+        match mode {
+            SVGMode::TextRenderingTests(id_prefix) => {
+                format!("{}.{}", id_prefix, self.glyph_name).into()
+            }
+            SVGMode::View => Cow::from(&self.glyph_name),
+        }
+    }
+
+    fn data(&self, mode: &SVGMode) -> HashMap<&'static str, String> {
+        match mode {
+            SVGMode::TextRenderingTests(_) => HashMap::new(),
+            SVGMode::View => {
+                let bool_true = String::from("true");
+                let mut data = HashMap::new();
+                if matches!(
+                    self.info.placement,
+                    Placement::MarkAnchor(_, _, _) | Placement::MarkOverprint(_)
+                ) {
+                    data.insert("data-mark", bool_true.clone());
+                }
+                data.insert("data-glyph-index", self.info.glyph.glyph_index.to_string());
+                data.insert(
+                    "data-liga-component-pos",
+                    self.info.glyph.liga_component_pos.to_string(),
+                );
+                data.insert(
+                    "data-glyph-origin",
+                    match self.info.glyph.glyph_origin {
+                        GlyphOrigin::Char(_) => String::from("char"),
+                        GlyphOrigin::Direct => String::from("direct"),
+                    },
+                );
+                if self.info.glyph.small_caps {
+                    data.insert("data-small-caps", bool_true.clone());
+                }
+                if self.info.glyph.multi_subst_dup {
+                    data.insert("data-multi-subst-dup", bool_true.clone());
+                }
+                if self.info.glyph.is_vert_alt {
+                    data.insert("data-is-vert-alt", bool_true.clone());
+                }
+                if self.info.glyph.fake_bold {
+                    data.insert("data-fake-bold", bool_true.clone());
+                }
+                if self.info.glyph.fake_italic {
+                    data.insert("data-fake-italic", bool_true.clone());
+                }
+                data
+            }
         }
     }
 }
