@@ -2,7 +2,7 @@ use std::ffi::OsString;
 
 use gumdrop::Options;
 
-use crate::writer::Margin;
+use crate::writer::{Colour, Margin};
 
 #[derive(Debug, Options)]
 pub struct Cli {
@@ -275,15 +275,35 @@ pub struct ViewOpts {
     #[options(help = "language to shape", meta = "LANG")]
     pub lang: Option<String>,
 
-    #[options(help = "Mark the origin of each glyph with a cross-hair", no_short)]
+    #[options(help = "mark the origin of each glyph with a cross-hair", no_short)]
     pub mark_origin: bool,
 
     #[options(
-        help = "Specify a margin to be added to the edge of the SVG",
+        help = "specify a margin to be added to the edge of the SVG",
         meta = "num or top,right,bottom,left",
         no_short
     )]
     pub margin: Option<Margin>,
+
+    #[options(
+        help = "set the fill colour of the glyphs",
+        meta = "rrggbbaa",
+        no_short
+    )]
+    pub fg_colour: Option<Colour>,
+
+    #[options(
+        help = "set the background colour of the generated SVG",
+        meta = "rrggbbaa",
+        no_short
+    )]
+    pub bg_colour: Option<Colour>,
+
+    #[options(help = "alias for --fg-colour", meta = "rrggbbaa", no_short)]
+    pub fg_color: Option<Colour>,
+
+    #[options(help = "alias for --bg-colour", meta = "rrggbbaa", no_short)]
+    pub bg_color: Option<Colour>,
 
     #[options(help = "text to render")]
     pub text: Option<String>,

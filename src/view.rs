@@ -170,6 +170,8 @@ impl From<&ViewOpts> for SVGMode {
         SVGMode::View {
             mark_origin: opts.mark_origin,
             margin: opts.margin.unwrap_or_default(),
+            fg: opts.fg_colour.or(opts.fg_color),
+            bg: opts.bg_colour.or(opts.bg_color),
         }
     }
 }
