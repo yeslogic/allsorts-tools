@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use allsorts::cff::CFF;
@@ -77,6 +78,71 @@ impl FromStr for Margin {
     }
 }
 
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Colour {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+impl FromStr for Colour {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 8 {
+            return Err(String::from(
+                "colour is not of the form: four hex values RRGGBBAA",
+            ));
+        }
+
+        let values = s
+            .as_bytes()
+            .chunks(2)
+            .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| err.to_string())?;
+        Ok(Colour {
+            r: values[0],
+            g: values[1],
+            b: values[2],
+            a: values[3],
+        })
+    }
+}
+
+impl Display for Colour {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let Colour { r, g, b, a: _ } = self;
+        write!(f, "#{:02x}{:02x}{:02x}", r, g, b)
+    }
+}
+
+impl Colour {
+    pub fn opacity(&self) -> f32 {
+        self.a as f32 / 255.
+    }
+}
+
+struct ViewBox {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+impl Display for ViewBox {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let ViewBox {
+            x,
+            y,
+            width,
+            height,
+        } = self;
+        write!(f, "{} {} {} {}", x, y, width, height)
+    }
+}
+
 impl<'a> GlyphName for CFF<'a> {
     fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
         let font = self.fonts.first()?;
@@ -116,7 +182,12 @@ pub enum SVGMode {
     /// The String is the testcase name to be used as a prefix on ids.
     TextRenderingTests(String),
     /// SVGs are being generated for human viewing
-    View { mark_origin: bool, margin: Margin },
+    View {
+        mark_origin: bool,
+        margin: Margin,
+        fg: Option<Colour>,
+        bg: Option<Colour>,
+    },
 }
 
 pub struct SVGWriter {
@@ -230,6 +301,18 @@ impl SVGWriter {
         w.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
         let view_box = self.view_box(x_max, f32::from(ascender), f32::from(descender));
         w.write_attribute("viewBox", &view_box);
+        if let Some(colour) = self.bg_colour() {
+            w.start_element("rect");
+            w.write_attribute("x", &view_box.x);
+            w.write_attribute("y", &view_box.y);
+            w.write_attribute("width", &view_box.width);
+            w.write_attribute("height", &view_box.height);
+            w.write_attribute("fill", &colour);
+            if colour.opacity() != 1. {
+                w.write_attribute("fill-opacity", &colour.opacity());
+            }
+            w.end_element()
+        }
 
         // Write symbols
         for symbol in &symbols.symbols {
@@ -241,6 +324,12 @@ impl SVGWriter {
             w.write_attribute("overflow", "visible");
             w.start_element("path");
             w.write_attribute("d", &symbol.path);
+            if let Some(colour) = self.fg_colour() {
+                w.write_attribute("fill", &colour);
+                if colour.opacity() != 1. {
+                    w.write_attribute("fill-opacity", &colour.opacity());
+                }
+            }
             w.end_element();
             if let Some(origin) = symbol.origin {
                 w.start_element("path");
@@ -265,7 +354,7 @@ impl SVGWriter {
         w.end_document()
     }
 
-    fn view_box(&self, x_max: f32, ascender: f32, descender: f32) -> String {
+    fn view_box(&self, x_max: f32, ascender: f32, descender: f32) -> ViewBox {
         let Margin {
             top,
             right,
@@ -277,11 +366,16 @@ impl SVGWriter {
         let scale_x = self.transform.extract_scale().x();
         let scale_y = self.transform.extract_scale().y();
 
-        let x = ((0. - left) * scale_x).round();
-        let y = ((min_y - top) * scale_y).round();
-        let width = ((x_max + left + right) * scale_x).round();
-        let height = ((ascender - descender + top + bottom) * scale_y).round();
-        format!("{} {} {} {}", x, y, width, height)
+        let x = ((0. - left) * scale_x).round() as i32;
+        let y = ((min_y - top) * scale_y).round() as i32;
+        let width = ((x_max + left + right) * scale_x).round() as i32;
+        let height = ((ascender - descender + top + bottom) * scale_y).round() as i32;
+        ViewBox {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     fn crosshair_path(&self, origin: Vector2F) -> String {
@@ -309,6 +403,20 @@ impl SVGWriter {
         match self.mode {
             SVGMode::TextRenderingTests(_) => Margin::default(),
             SVGMode::View { margin, .. } => margin,
+        }
+    }
+
+    fn fg_colour(&self) -> Option<Colour> {
+        match self.mode {
+            SVGMode::TextRenderingTests(_) => None,
+            SVGMode::View { fg, .. } => fg,
+        }
+    }
+
+    fn bg_colour(&self) -> Option<Colour> {
+        match self.mode {
+            SVGMode::TextRenderingTests(_) => None,
+            SVGMode::View { bg, .. } => bg,
         }
     }
 }
