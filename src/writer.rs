@@ -186,19 +186,7 @@ impl SVGWriter {
         w.write_attribute("version", "1.1");
         w.write_attribute("xmlns", "http://www.w3.org/2000/svg");
         w.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-        let width = self.transform.extract_scale().x() * x_max;
-        let ascender = self.transform.extract_scale().y() * f32::from(ascender);
-        let descender = self.transform.extract_scale().y() * f32::from(descender);
-        let height = ascender - descender;
-        let is_flipped = self.transform.m22() < 0.0;
-        let min_y = if is_flipped { -ascender } else { descender };
-        let view_box = format!(
-            "{} {} {} {}",
-            0,
-            min_y.round(),
-            width.round(),
-            height.round()
-        );
+        let view_box = self.view_box(x_max, f32::from(ascender), f32::from(descender));
         w.write_attribute("viewBox", &view_box);
 
         // Write symbols
@@ -213,27 +201,10 @@ impl SVGWriter {
             w.write_attribute("d", &symbol.path);
             w.end_element();
             if let Some(origin) = symbol.origin {
-                let x = origin.x();
-                let y = origin.y();
                 w.start_element("path");
-                let crosshair_size = 100. * self.transform.extract_scale().x();
-                let crosshair = format!(
-                    " M{},{} L{},{} M{},{} L{},{}",
-                    x - crosshair_size,
-                    y,
-                    x + crosshair_size,
-                    y,
-                    x,
-                    y - crosshair_size,
-                    x,
-                    y + crosshair_size
-                );
-                w.write_attribute("d", &crosshair);
+                w.write_attribute("d", &self.crosshair_path(origin));
                 w.write_attribute("stroke", "red");
-                w.write_attribute(
-                    "stroke-width",
-                    &format!("{}", self.transform.extract_scale().x() * 10.),
-                );
+                w.write_attribute("stroke-width", &(self.transform.extract_scale().x() * 10.));
                 w.end_element();
             }
             w.end_element();
@@ -252,8 +223,29 @@ impl SVGWriter {
         w.end_document()
     }
 
+    fn view_box(&self, x_max: f32, ascender: f32, descender: f32) -> String {
+        let width = (self.transform.extract_scale().x() * x_max).round();
+        let ascender = self.transform.extract_scale().y() * ascender;
+        let descender = self.transform.extract_scale().y() * descender;
+        let height = (ascender - descender).round();
+        let is_flipped = self.transform.m22() < 0.0;
+        let min_y = if is_flipped { -ascender } else { descender }.round();
+        format!("{} {} {} {}", 0, min_y, width, height)
+    }
+
+    fn crosshair_path(&self, origin: Vector2F) -> String {
+        let x = origin.x();
+        let y = origin.y();
+        let crosshair_size = 100. * self.transform.extract_scale().x();
+        let xl = x - crosshair_size;
+        let xr = x + crosshair_size;
+        let yb = y - crosshair_size;
+        let yt = y + crosshair_size;
+        format!("M{},{} L{},{} M{},{} L{},{}", xl, y, xr, y, x, yb, x, yt)
+    }
+
     fn annotate(&self) -> bool {
-        matches!(self.mode, SVGMode::View { annotate: true })
+        matches!(self.mode, SVGMode::View { annotate: true, .. })
     }
 }
 
