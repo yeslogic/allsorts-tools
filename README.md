@@ -117,7 +117,7 @@ The `dump` tool prints or extracts information from a font file.
 
 `allsorts dump path/to/font` prints out information about the font.
 
-`--name` includes the meta data contained in the `name` table in the output.
+`--name` includes the metadata contained in the `name` table in the output.
 
 `-c` can be used to print information about a CFF font or table not
 wrapped in a TrueType or OpenType container.
@@ -230,6 +230,9 @@ large repertoire of real world fonts.
 
 The `view` tool shapes the supplied text or list of codepoints according to the
 supplied font, language, and script. Then, it generates an SVG of the glyphs.
+
+`--annotate` will place a cross-hair at the origin of each glyph in the generated
+SVG.
 
 #### Example Using Text
 
