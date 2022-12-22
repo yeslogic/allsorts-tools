@@ -24,6 +24,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     let script = tag::from_string(&opts.script)?;
     let lang = opts
         .lang
+        .as_deref()
         .map(|s| tag::from_string(&s).expect("invalid language tag"));
 
     match (&opts.text, &opts.codepoints, &opts.indices) {
@@ -35,7 +36,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     }
 
     let features = match opts.features {
-        Some(features) => parse_features(&features),
+        Some(ref features) => parse_features(&features),
         None => Features::Mask(FeatureMask::default()),
     };
 
@@ -51,12 +52,12 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
         }
     };
 
-    let glyphs = if let Some(text) = opts.text {
+    let glyphs = if let Some(ref text) = opts.text {
         font.map_glyphs(&text, script, MatchingPresentation::NotRequired)
-    } else if let Some(codepoints) = opts.codepoints {
+    } else if let Some(ref codepoints) = opts.codepoints {
         let text = parse_codepoints(&codepoints);
         font.map_glyphs(&text, script, MatchingPresentation::NotRequired)
-    } else if let Some(indices) = opts.indices {
+    } else if let Some(ref indices) = opts.indices {
         parse_glyph_indices(&indices)
     } else {
         panic!("expected --text OR --codepoints OR --indices");
@@ -74,9 +75,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     let head = font.head_table()?.ok_or(ParseError::MissingValue)?;
     let scale = FONT_SIZE / f32::from(head.units_per_em);
     let transform = Matrix2x2F::from_scale(vec2f(scale, -scale));
-    let mode = SVGMode::View {
-        annotate: opts.annotate,
-    };
+    let mode = SVGMode::from(&opts);
     let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF)
         && provider.sfnt_version() == tag::OTTO
     {
@@ -164,4 +163,12 @@ fn parse_features(features: &str) -> Features {
         })
         .collect();
     Features::Custom(feature_infos)
+}
+
+impl From<&ViewOpts> for SVGMode {
+    fn from(opts: &ViewOpts) -> Self {
+        SVGMode::View {
+            annotate: opts.annotate,
+        }
+    }
 }
