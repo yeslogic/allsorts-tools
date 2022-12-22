@@ -273,6 +273,9 @@ pub struct ViewOpts {
     #[options(help = "language to shape", meta = "LANG")]
     pub lang: Option<String>,
 
+    #[options(help = "Annotate the origin of each glyph with a cross-hair", no_short)]
+    pub annotate: bool,
+
     #[options(help = "text to render")]
     pub text: Option<String>,
 

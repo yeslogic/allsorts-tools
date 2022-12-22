@@ -23,6 +23,7 @@ struct Symbol<'info> {
     glyph_name: String,
     path: String,
     info: &'info Info,
+    origin: Option<Vector2F>,
 }
 
 pub trait GlyphName {
@@ -73,7 +74,7 @@ pub enum SVGMode {
     /// The String is the testcase name to be used as a prefix on ids.
     TextRenderingTests(String),
     /// SVGs are being generated for human viewing
-    View,
+    View { annotate: bool },
 }
 
 pub struct SVGWriter {
@@ -152,6 +153,9 @@ impl SVGWriter {
                 let symbol_index = symbols.new_glyph(glyph_name, info);
                 symbol_map.insert(glyph_index, symbol_index);
                 builder.visit(glyph_index, &mut symbols)?;
+                if self.annotate() {
+                    symbols.annotate(symbol_index, pos.x_offset as f32, pos.y_offset as f32);
+                }
                 self.use_glyph(
                     symbol_index,
                     x + pos.x_offset as f32,
@@ -208,6 +212,30 @@ impl SVGWriter {
             w.start_element("path");
             w.write_attribute("d", &symbol.path);
             w.end_element();
+            if let Some(origin) = symbol.origin {
+                let x = origin.x();
+                let y = origin.y();
+                w.start_element("path");
+                let crosshair_size = 100. * self.transform.extract_scale().x();
+                let crosshair = format!(
+                    " M{},{} L{},{} M{},{} L{},{}",
+                    x - crosshair_size,
+                    y,
+                    x + crosshair_size,
+                    y,
+                    x,
+                    y - crosshair_size,
+                    x,
+                    y + crosshair_size
+                );
+                w.write_attribute("d", &crosshair);
+                w.write_attribute("stroke", "red");
+                w.write_attribute(
+                    "stroke-width",
+                    &format!("{}", self.transform.extract_scale().x() * 10.),
+                );
+                w.end_element();
+            }
             w.end_element();
         }
 
@@ -223,6 +251,10 @@ impl SVGWriter {
 
         w.end_document()
     }
+
+    fn annotate(&self) -> bool {
+        matches!(self.mode, SVGMode::View { annotate: true })
+    }
 }
 
 impl<'info> Symbols<'info> {
@@ -235,6 +267,10 @@ impl<'info> Symbols<'info> {
     fn current_path(&mut self) -> &mut String {
         &mut self.symbols.last_mut().unwrap().path
     }
+
+    fn annotate(&mut self, index: usize, x: f32, y: f32) {
+        self.symbols[index].annotate(vec2f(x, y));
+    }
 }
 
 impl<'info> Symbol<'info> {
@@ -243,6 +279,7 @@ impl<'info> Symbol<'info> {
             glyph_name,
             path: String::new(),
             info,
+            origin: None,
         }
     }
 
@@ -251,14 +288,14 @@ impl<'info> Symbol<'info> {
             SVGMode::TextRenderingTests(id_prefix) => {
                 format!("{}.{}", id_prefix, self.glyph_name).into()
             }
-            SVGMode::View => Cow::from(&self.glyph_name),
+            SVGMode::View { .. } => Cow::from(&self.glyph_name),
         }
     }
 
     fn data(&self, mode: &SVGMode) -> HashMap<&'static str, String> {
         match mode {
             SVGMode::TextRenderingTests(_) => HashMap::new(),
-            SVGMode::View => {
+            SVGMode::View { .. } => {
                 let bool_true = String::from("true");
                 let mut data = HashMap::new();
                 if matches!(
@@ -297,6 +334,10 @@ impl<'info> Symbol<'info> {
                 data
             }
         }
+    }
+
+    fn annotate(&mut self, origin: Vector2F) {
+        self.origin = Some(origin);
     }
 }
 
