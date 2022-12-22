@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use allsorts::cff::CFF;
 use allsorts::context::Glyph;
@@ -33,6 +34,47 @@ pub trait GlyphName {
 pub struct GlyfPost<'a> {
     pub glyf: GlyfTable<'a>,
     pub post: Option<PostTable<'a>>,
+}
+
+/// A margin for the SVG
+///
+/// Fields are (top, right, bottom, left) I.e. the same order as CSS.
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Margin {
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub left: f32,
+}
+
+impl FromStr for Margin {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts = s
+            .split(',')
+            .map(|part| part.parse())
+            .collect::<Result<Vec<f32>, _>>()
+            .map_err(|err| err.to_string())?;
+        match parts.as_slice() {
+            &[top, right, bottom, left] => Ok(Margin {
+                top,
+                right,
+                bottom,
+                left,
+            }),
+            &[num] => Ok(Margin {
+                top: num,
+                right: num,
+                bottom: num,
+                left: num,
+            }),
+            _ => Err(format!(
+                "Expected margin of either a single number or 4 numbers, got {}",
+                parts.len()
+            )),
+        }
+    }
 }
 
 impl<'a> GlyphName for CFF<'a> {
@@ -74,7 +116,7 @@ pub enum SVGMode {
     /// The String is the testcase name to be used as a prefix on ids.
     TextRenderingTests(String),
     /// SVGs are being generated for human viewing
-    View { mark_origin: bool },
+    View { mark_origin: bool, margin: Margin },
 }
 
 pub struct SVGWriter {
@@ -224,13 +266,22 @@ impl SVGWriter {
     }
 
     fn view_box(&self, x_max: f32, ascender: f32, descender: f32) -> String {
-        let width = (self.transform.extract_scale().x() * x_max).round();
-        let ascender = self.transform.extract_scale().y() * ascender;
-        let descender = self.transform.extract_scale().y() * descender;
-        let height = (ascender - descender).round();
+        let Margin {
+            top,
+            right,
+            bottom,
+            left,
+        } = self.margin();
         let is_flipped = self.transform.m22() < 0.0;
-        let min_y = if is_flipped { -ascender } else { descender }.round();
-        format!("{} {} {} {}", 0, min_y, width, height)
+        let min_y = if is_flipped { -ascender } else { descender };
+        let scale_x = self.transform.extract_scale().x();
+        let scale_y = self.transform.extract_scale().y();
+
+        let x = ((0. - left) * scale_x).round();
+        let y = ((min_y - top) * scale_y).round();
+        let width = ((x_max + left + right) * scale_x).round();
+        let height = ((ascender - descender + top + bottom) * scale_y).round();
+        format!("{} {} {} {}", x, y, width, height)
     }
 
     fn crosshair_path(&self, origin: Vector2F) -> String {
@@ -252,6 +303,13 @@ impl SVGWriter {
                 ..
             }
         )
+    }
+
+    fn margin(&self) -> Margin {
+        match self.mode {
+            SVGMode::TextRenderingTests(_) => Margin::default(),
+            SVGMode::View { margin, .. } => margin,
+        }
     }
 }
 

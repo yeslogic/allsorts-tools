@@ -169,6 +169,7 @@ impl From<&ViewOpts> for SVGMode {
     fn from(opts: &ViewOpts) -> Self {
         SVGMode::View {
             mark_origin: opts.mark_origin,
+            margin: opts.margin.unwrap_or_default(),
         }
     }
 }

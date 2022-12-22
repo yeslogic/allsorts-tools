@@ -2,6 +2,8 @@ use std::ffi::OsString;
 
 use gumdrop::Options;
 
+use crate::writer::Margin;
+
 #[derive(Debug, Options)]
 pub struct Cli {
     #[options(help = "print help message")]
@@ -275,6 +277,13 @@ pub struct ViewOpts {
 
     #[options(help = "Mark the origin of each glyph with a cross-hair", no_short)]
     pub mark_origin: bool,
+
+    #[options(
+        help = "Specify a margin to be added to the edge of the SVG",
+        meta = "num or top,right,bottom,left",
+        no_short
+    )]
+    pub margin: Option<Margin>,
 
     #[options(help = "text to render")]
     pub text: Option<String>,
