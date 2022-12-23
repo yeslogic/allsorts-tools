@@ -74,7 +74,7 @@ pub enum SVGMode {
     /// The String is the testcase name to be used as a prefix on ids.
     TextRenderingTests(String),
     /// SVGs are being generated for human viewing
-    View { annotate: bool },
+    View { mark_origin: bool },
 }
 
 pub struct SVGWriter {
@@ -245,7 +245,13 @@ impl SVGWriter {
     }
 
     fn annotate(&self) -> bool {
-        matches!(self.mode, SVGMode::View { annotate: true, .. })
+        matches!(
+            self.mode,
+            SVGMode::View {
+                mark_origin: true,
+                ..
+            }
+        )
     }
 }
 
