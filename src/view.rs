@@ -168,7 +168,7 @@ fn parse_features(features: &str) -> Features {
 impl From<&ViewOpts> for SVGMode {
     fn from(opts: &ViewOpts) -> Self {
         SVGMode::View {
-            annotate: opts.annotate,
+            mark_origin: opts.mark_origin,
         }
     }
 }

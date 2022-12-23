@@ -231,7 +231,7 @@ large repertoire of real world fonts.
 The `view` tool shapes the supplied text or list of codepoints according to the
 supplied font, language, and script. Then, it generates an SVG of the glyphs.
 
-`--annotate` will place a cross-hair at the origin of each glyph in the generated
+`--mark-origin` will place a cross-hair at the origin of each glyph in the generated
 SVG.
 
 #### Example Using Text
