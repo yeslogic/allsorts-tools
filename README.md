@@ -4,7 +4,9 @@
 </h1>
 
 <div align="center">
-  <strong>Example tools for the <a href="https://github.com/yeslogic/allsorts">Allsorts</a> font parser, shaping engine, and subsetter</strong>
+  <strong>Font utilities implemented using the
+  <a href="https://github.com/yeslogic/allsorts">Allsorts</a> font parser, shaping
+  engine, and subsetter.</strong>
 </div>
 
 <br>
@@ -19,13 +21,13 @@
 
 <br>
 
-[Allsorts](https://github.com/yeslogic/allsorts)
-is a font parser, shaping engine, and subsetter for OpenType, WOFF, and WOFF2
-written entirely in Rust. This repository contains tools that were developed to
-debug and test Allsorts and provide examples of its use.
+[Allsorts](https://github.com/yeslogic/allsorts) is a font parser, shaping
+engine, and subsetter for OpenType, WOFF, and WOFF2 written entirely in Rust.
+This repository contains tools that were developed to debug and test Allsorts
+and provide examples of its use.
 
-**Note:** These tools are for demonstration and reference purposes. You should
-not rely on them for production workflows.
+**Note:** These tools are for demonstration, reference, and debugging purposes.
+You should not rely on them for production workflows.
 
 ## Tools
 
@@ -35,19 +37,23 @@ Available tools:
 * [`cmap`](#cmap) — print character to glyph mappings
 * [`dump`](#dump) — dump font information
 * [`has-table`](#has-table) — check if a font has a particular table
-* [`layout-features`](#layout-features) - print a list of a font's GSUB and GPOS features
+* [`layout-features`](#layout-features) — print a list of a font's GSUB and GPOS features
 * [`shape`](#shape) — apply shaping to glyphs from a font
 * [`subset`](#subset) — subset a font
 * [`validate`](#validate) — parse the supplied font, reporting any failures
-* [`view`](#view) - generate SVGs from glyphs
+* [`view`](#view) — generate SVGs from glyphs
 
 ### `bitmaps`
 
 The `bitmaps` tool extracts bitmaps from fonts containing glyph bitmaps in
 either the `EBLC`/`EBDT` or `CBLC`/`CBDT` tables.
 
-`-o` is the path to the directory to write the bitmaps to. It will be created
-if it does not exist.
+#### Options
+
+* `-o` is the path to the directory to write the bitmaps to. It will be created
+  if it does not exist.
+
+#### Description
 
 The images are written out as PNGs in a sub-directory for each strike (size).
 The format is `{ppem_x}x{ppem_y}@{bit_depth}`, the files are named
@@ -81,9 +87,10 @@ glyph index entries. If the encoding of the table is Unicode then the characters
 are printed along with the code point, otherwise just the numeric value of the
 character is printed.
 
-`-f`, `--font` specifies the path to the font file.
+#### Options
 
-`-i`, `--index` is index of the font to dump (for TTC, WOFF2) (default: 0).
+* `-f`, `--font` specifies the path to the font file.
+* `-i`, `--index` is index of the font to dump (for TTC, WOFF2) (default: 0).
 
 #### Example
 
@@ -117,17 +124,15 @@ The `dump` tool prints or extracts information from a font file.
 
 `allsorts dump path/to/font` prints out information about the font.
 
-`--name` includes the metadata contained in the `name` table in the output.
+#### Options
 
-`-c` can be used to print information about a CFF font or table not
-wrapped in a TrueType or OpenType container.
-
-`-t` extracts the named table from the supplied font. The output should be
-redirected to a file. E.g. `allsorts dump -t glyf > glyf.bin`
-
-`-g` prints information about a specific glyph in a font.
-
-`-l` prints out all offsets in the `loca` table in the font.
+* `--name` includes the metadata contained in the `name` table in the output.
+* `-c` can be used to print information about a CFF font or table not
+  wrapped in a TrueType or OpenType container.
+* `-t` extracts the named table from the supplied font. The output should be
+  redirected to a file. E.g. `allsorts dump -t glyf > glyf.bin`
+* `-g` prints information about a specific glyph in a font.
+* `-l` prints out all offsets in the `loca` table in the font.
 
 #### Example
 
@@ -158,10 +163,13 @@ redirected to a file. E.g. `allsorts dump -t glyf > glyf.bin`
 The `has-table` tool checks if the supplied font file contains the table passed
 via the `-t` argument.  If the font contains the table it exits with status
 success (0), if the font does not contain the table it exits with status 1.
-The `-p` option makes the tool print the path to the font if it contains the
-table.
 
 This tool is handy combined with `find`, to locate fonts that have the desired table.
+
+#### Options
+
+* `-p` makes the tool print the path to the font if it contains the
+  table.
 
 #### Example
 
@@ -196,6 +204,14 @@ Prints an indented list of a font's GSUB and GPOS features.
 The `shape` tool shapes the supplied text according to the supplied font, language, and
 script. It prints out the glyphs before and after shaping.
 
+#### Options
+
+*  `-f`, `--font PATH` path to font file
+*  `-i`, `--index INDEX` index of the font to shape (for TTC, WOFF2) (default: 0)
+*  `-s`, `--script SCRIPT` script to shape
+*  `-l`, `--lang LANG` language to shape
+*  `--vertical` vertical layout, default is horizontal
+
 #### Example
 
     $ shape -f fonts/devanagari/AnnapurnaSIL-Regular.ttf -s deva -l HIN 'शब्दों और वाक्यों की तरह'
@@ -205,6 +221,12 @@ script. It prints out the glyphs before and after shaping.
 
 The `subset` tool takes a source font and some text and writes a new version of
 the source font only containing the glyphs required for the supplied text.
+
+#### Options
+
+`-t`, `--text TEXT` subset the font to include glyphs from TEXT
+`-a`, `--all` include all glyphs in the subset font
+`-i`, `--index INDEX` index of the font to subset (for TTC, WOFF2) (default: 0)
 
 #### Example
 
@@ -231,8 +253,21 @@ large repertoire of real world fonts.
 The `view` tool shapes the supplied text or list of codepoints according to the
 supplied font, language, and script. Then, it generates an SVG of the glyphs.
 
-`--mark-origin` will place a cross-hair at the origin of each glyph in the generated
-SVG.
+#### Options
+
+* `-f`, `--font PATH` path to font file
+* `-s`, `--script SCRIPT` script to shape
+* `-l`, `--lang LANG` language to shape
+* `--mark-origin` mark the origin of each glyph with a cross-hair
+* `--margin num` or `top,right,bottom,left` specify a margin to be added to the edge of the SVG
+* `--fg-colour rrggbbaa` set the fill colour of the glyphs
+* `--bg-colour rrggbbaa` set the background colour of the generated SVG
+* `--fg-color rrggbbaa` alias for `--fg-colour`
+* `--bg-color rrggbbaa` alias for `--bg-colour`
+* `-t`, `--text TEXT` text to render
+* `-c`, `--codepoints CODEPOINTS` comma-separated list of codepoints (as hexadecimal numbers) to render
+* `-i`, `--indices GLYPH_INDICES` comma-separated list of glyph indices to render
+* `-F`, `--features FEATURES`  comma-separated list of OpenType features to enable (note: only enables these features)
 
 #### Example Using Text
 
