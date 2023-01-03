@@ -183,7 +183,7 @@ pub struct ShapeOpts {
     pub font: String,
 
     #[options(
-        help = "index of the font to dump (for TTC, WOFF2)",
+        help = "index of the font to shape (for TTC, WOFF2)",
         meta = "INDEX",
         default = "0"
     )]
@@ -214,7 +214,7 @@ pub struct SubsetOpts {
     pub all: bool,
 
     #[options(
-        help = "index of the font to dump (for TTC, WOFF2)",
+        help = "index of the font to subset (for TTC, WOFF2)",
         meta = "INDEX",
         default = "0"
     )]
