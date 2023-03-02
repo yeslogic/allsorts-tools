@@ -291,9 +291,9 @@ to be replaced by its special presentation form (glyph 547).
 
 ### From Source
 
-**Minimum Supported Rust Version:** 1.51.0
+**Minimum Supported Rust Version:** Same as Allsorts
 
-To build the tools ensure you have [Rust 1.51.0 or newer installed](https://www.rust-lang.org/tools/install).
+To build the tools ensure you have [Rust installed](https://www.rust-lang.org/tools/install).
 
 * Build: `cargo build --release`
 * Install: `cargo install --path .`
