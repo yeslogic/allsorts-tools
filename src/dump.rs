@@ -422,7 +422,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
                 println!("  - {:?}: {:?}", op, operands);
             }
             let (subrs_count, subrs_size) = match type1.local_subr_index {
-                Some(ref index) => (index.count, index.data_len()),
+                Some(ref index) => (index.len(), index.data_len()),
                 None => (0, 0),
             };
             println!(" - Local subrs: {} ({} bytes)", subrs_count, subrs_size);
@@ -448,7 +448,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
                     .iter()
                     .fold((0, 0), |(mut count, mut size), index| {
                         if let Some(index) = index {
-                            count += index.count;
+                            count += index.len();
                             size += index.data_len();
                         }
                         (count, size)
@@ -464,7 +464,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     }
     println!(
         " - Global subrs: {} ({} bytes)",
-        cff.global_subr_index.count,
+        cff.global_subr_index.len(),
         cff.global_subr_index.data_len()
     );
 
