@@ -12,8 +12,8 @@
 <br>
 
 <div align="center">
-  <a href="https://travis-ci.com/yeslogic/allsorts-tools">
-    <img src="https://travis-ci.com/yeslogic/allsorts-tools.svg?token=4GA6ydxNNeb6XeELrMmg&amp;branch=master" alt="Build Status"></a>
+  <a href="https://github.com/yeslogic/allsorts-tools/actions/workflows/ci.yml">
+    <img src="https://github.com/yeslogic/allsorts-tools/actions/workflows/ci.yml/badge.svg" alt="Build Status"></a>
   <a href="https://github.com/yeslogic/allsorts-tools/blob/master/LICENSE">
     <img src="https://img.shields.io/github/license/yeslogic/allsorts-tools.svg" alt="License">
   </a>
