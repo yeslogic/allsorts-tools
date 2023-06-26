@@ -67,12 +67,8 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
     } else {
         match &font_file {
             FontData::OpenType(font_file) => match &font_file.data {
-                OpenTypeData::Single(ttf) => {
-                    dump_ttf(&table_provider, &font_file.scope, ttf, table, flags)?
-                }
-                OpenTypeData::Collection(ttc) => {
-                    dump_ttc(&table_provider, &font_file.scope, ttc, table, flags)?
-                }
+                OpenTypeData::Single(ttf) => dump_ttf(&font_file.scope, ttf, table, flags)?,
+                OpenTypeData::Collection(ttc) => dump_ttc(&font_file.scope, ttc, table, flags)?,
             },
             FontData::Woff(woff_file) => dump_woff(woff_file, table, flags)?,
             FontData::Woff2(woff_file) => dump_woff2(
@@ -85,11 +81,18 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
         }
     }
 
+    if flags.encodings {
+        print_cmap_encodings(&table_provider)?;
+    }
+    if flags.glyphs_names {
+        println!();
+        print_glyph_names(&table_provider)?;
+    }
+
     Ok(0)
 }
 
 fn dump_ttc<'a>(
-    provider: &impl FontTableProvider,
     scope: &ReadScope<'a>,
     ttc: &TTCHeader<'a>,
     tag: Option<Tag>,
@@ -102,14 +105,13 @@ fn dump_ttc<'a>(
     for offset_table_offset in &ttc.offset_tables {
         let offset_table_offset = usize::try_from(offset_table_offset).map_err(ParseError::from)?;
         let offset_table = scope.offset(offset_table_offset).read::<OffsetTable>()?;
-        dump_ttf(provider, scope, &offset_table, tag, flags)?;
+        dump_ttf(scope, &offset_table, tag, flags)?;
     }
     println!();
     Ok(())
 }
 
 fn dump_ttf<'a>(
-    provider: &impl FontTableProvider,
     scope: &ReadScope<'a>,
     ttf: &OffsetTable<'a>,
     tag: Option<Tag>,
@@ -148,13 +150,6 @@ fn dump_ttf<'a>(
             let name_table = name_table_data.read::<NameTable>()?;
             dump_name_table(&name_table)?;
         }
-    }
-    if flags.encodings {
-        print_cmap_encodings(provider)?;
-    }
-    if flags.glyphs_names {
-        println!();
-        print_glyph_names(provider)?;
     }
     Ok(())
 }
