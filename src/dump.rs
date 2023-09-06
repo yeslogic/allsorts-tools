@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::str;
 
 use atty::Stream;
-use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
+use encoding_rs::{MACINTOSH, UTF_16BE};
 
 use allsorts::binary::read::ReadScope;
 use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
@@ -24,7 +24,7 @@ use allsorts::woff::WoffFont;
 use allsorts::woff2::{Woff2Font, Woff2GlyfTable, Woff2LocaTable};
 
 use crate::cli::DumpOpts;
-use crate::{BoxError, ErrorMessage};
+use crate::{decode, BoxError, ErrorMessage};
 
 type Tag = u32;
 
@@ -306,6 +306,17 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
         println!();
     }
 
+    if let Some(langtag_records) = &name_table.opt_langtag_records {
+        for langtag in langtag_records.iter() {
+            let name_data = name_table
+                .string_storage
+                .offset_length(langtag.offset.into(), langtag.length.into())?
+                .data();
+            let name = decode(UTF_16BE, name_data);
+            println!("langtag {}", name);
+        }
+    }
+
     Ok(())
 }
 
@@ -502,17 +513,6 @@ fn dump_raw_table(scope: Option<ReadScope>) -> Result<(), BoxError> {
             .map_err(|err| err.into())
     } else {
         Err(ErrorMessage("Table not found").into())
-    }
-}
-
-fn decode(encoding: &'static Encoding, data: &[u8]) -> String {
-    let mut decoder = encoding.new_decoder();
-    if let Some(size) = decoder.max_utf8_buffer_length(data.len()) {
-        let mut s = String::with_capacity(size);
-        let (_res, _read, _repl) = decoder.decode_to_string(data, &mut s, true);
-        s
-    } else {
-        String::new() // can only happen if buffer is enormous
     }
 }
 
