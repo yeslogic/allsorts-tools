@@ -44,6 +44,9 @@ pub enum Command {
     #[options(help = "parse the supplied font, reporting any failures")]
     Validate(ValidateOpts),
 
+    #[options(help = "print a list of a font's variations")]
+    Variations(VariationsOpts),
+
     #[options(help = "output an SVG rendition of the supplied text")]
     View(ViewOpts),
 }
@@ -258,6 +261,22 @@ pub struct ValidateOpts {
     pub help: bool,
 
     #[options(free, required, help = "path to font")]
+    pub font: String,
+}
+
+#[derive(Debug, Options)]
+pub struct VariationsOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
+    #[options(free, required, help = "path to font file")]
     pub font: String,
 }
 
