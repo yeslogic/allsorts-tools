@@ -3,7 +3,8 @@ use std::{env, process};
 
 use allsorts_tools::cli::*;
 use allsorts_tools::{
-    bitmaps, cmap, dump, has_table, layout_features, shape, subset, svg, validate, view, BoxError,
+    bitmaps, cmap, dump, has_table, layout_features, shape, subset, svg, validate, variations,
+    view, BoxError,
 };
 use gumdrop::Options;
 
@@ -39,6 +40,7 @@ fn allsorts_main() -> Result<i32, BoxError> {
         Some(Command::Subset(opts)) => subset::main(opts),
         Some(Command::Svg(opts)) => svg::main(opts),
         Some(Command::Validate(opts)) => validate::main(opts),
+        Some(Command::Variations(opts)) => variations::main(opts),
         Some(Command::View(opts)) => view::main(opts),
         None => usage(),
     }
