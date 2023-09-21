@@ -12,6 +12,8 @@ use allsorts::error::ParseError;
 use allsorts::font::read_cmap_subtable;
 use allsorts::font_data::FontData;
 use allsorts::glyph_info::GlyphNames;
+use allsorts::morx::morx_substitution_test;
+use allsorts::morx::MorxTable;
 use allsorts::tables::cmap::{Cmap, CmapSubtable};
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
@@ -58,6 +60,8 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
 
     if opts.loca {
         dump_loca_table(&table_provider)?;
+    } else if opts.morx {
+        dump_morx_table(&table_provider)?;
     } else if opts.head {
         dump_head_table(&table_provider)?;
     } else if opts.hmtx {
@@ -145,12 +149,23 @@ fn dump_ttf<'a>(
         dump_cff_table(cff_table_data)?;
     }
     println!();
+
     if flags.name {
         if let Some(name_table_data) = ttf.read_table(scope, tag::NAME)? {
             let name_table = name_table_data.read::<NameTable>()?;
             dump_name_table(&name_table)?;
         }
     }
+
+    //-----------for Morx table testing
+    if let Some(morx_table_data) = ttf.read_table(&scope, tag::MORX)? {
+        println!("there is a morx table in the font!");
+        //dump_cff_table(cff_table_data)?;
+        //morx_ligature_test(morx_table_data)?;
+        morx_substitution_test(morx_table_data)?;
+    }
+    println!();
+
     Ok(())
 }
 
@@ -312,6 +327,14 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
 fn dump_head_table(provider: &impl FontTableProvider) -> Result<(), ParseError> {
     let head = ReadScope::new(&provider.read_table_data(tag::HEAD)?).read::<HeadTable>()?;
     println!("{:#?}", head);
+    Ok(())
+}
+
+fn dump_morx_table(provider: &impl FontTableProvider) -> Result<(), ParseError> {
+    //let morx = ReadScope::new(&provider.read_table_data(tag::MORX)?).read::<MorxTable>()?;
+    let binding = provider.read_table_data(tag::MORX)?;
+    let morx = ReadScope::new(&binding).read::<MorxTable>()?;
+    println!("{:#?}", morx);
     Ok(())
 }
 

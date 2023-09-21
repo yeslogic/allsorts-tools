@@ -128,6 +128,9 @@ pub struct DumpOpts {
     #[options(help = "print the loca table")]
     pub loca: bool,
 
+    #[options(help = "print the morx table")]
+    pub morx: bool,
+
     #[options(free, required, help = "path to font to dump")]
     pub font: String,
 }
