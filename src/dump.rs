@@ -259,8 +259,8 @@ fn dump_woff2<'a>(
         ))?;
         let glyf = table.scope().read_dep::<Woff2GlyfTable>((entry, &loca))?;
 
-        println!("Read glyf table with {} glyphs:", glyf.records.len());
-        for glyph in glyf.records {
+        println!("Read glyf table with {} glyphs:", glyf.records().len());
+        for glyph in glyf.records() {
             println!("- {:?}", glyph);
         }
     }
@@ -485,7 +485,7 @@ fn dump_glyph(provider: &impl FontTableProvider, glyph_id: u16) -> Result<(), Pa
     let glyf = scope.read_dep::<GlyfTable>(&loca)?;
 
     let mut glyph = glyf
-        .records
+        .records()
         .get(usize::from(glyph_id))
         .ok_or(ParseError::BadValue)?
         .clone();

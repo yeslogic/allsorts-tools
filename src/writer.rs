@@ -150,7 +150,7 @@ impl<'a> GlyphName for CFF<'a> {
             return None;
         }
         let sid = font.charset.id_for_glyph(glyph_id)?;
-        self.read_string(sid).ok()
+        self.read_string(sid).ok().map(|s| s.to_owned())
     }
 }
 
