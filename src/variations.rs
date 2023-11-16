@@ -1,10 +1,10 @@
 use allsorts::binary::read::ReadScope;
 use allsorts::font_data::FontData;
 use allsorts::tables::variable_fonts::fvar::FvarTable;
+use allsorts::tables::variable_fonts::stat::StatTable;
 use allsorts::tables::{FontTableProvider, NameTable};
 use allsorts::tag;
 use allsorts::tag::DisplayTag;
-use encoding_rs::{MACINTOSH, UTF_16BE};
 
 use crate::cli::VariationsOpts;
 use crate::BoxError;
@@ -27,15 +27,13 @@ fn print_variations(provider: &impl FontTableProvider) -> Result<(), BoxError> {
     let scope = ReadScope::new(&table);
     let fvar = scope.read::<FvarTable>()?;
 
-    let name_table_data = provider.table_data(tag::NAME)?;
-    let name_table = name_table_data
-        .as_ref()
-        .map(|data| ReadScope::new(data).read::<NameTable>())
-        .transpose()?;
+    let name_table_data = provider.read_table_data(tag::NAME)?;
+    let name_table = ReadScope::new(&name_table_data).read::<NameTable>()?;
+    let stat_table_data = provider.read_table_data(tag::STAT)?;
+    let stat_table = ReadScope::new(&stat_table_data).read::<StatTable>()?;
 
     println!("Axes: ({})\n", fvar.axes().count());
     for axis in fvar.axes() {
-        let axis = axis?;
         println!(
             "- {} = min: {}, max: {}, default: {}",
             DisplayTag(axis.axis_tag),
@@ -47,10 +45,10 @@ fn print_variations(provider: &impl FontTableProvider) -> Result<(), BoxError> {
     println!("\nInstances:");
     for instance in fvar.instances() {
         let instance = instance?;
-        let subfamily = english_name_for_name_id(&name_table, instance.subfamily_name_id);
+        let subfamily = name_table.string_for_id(instance.subfamily_name_id);
         let postscript_name = instance
             .post_script_name_id
-            .and_then(|name_id| english_name_for_name_id(&name_table, name_id));
+            .and_then(|name_id| name_table.string_for_id(name_id));
 
         println!(
             "\n      Subfamily: {}",
@@ -62,56 +60,27 @@ fn print_variations(provider: &impl FontTableProvider) -> Result<(), BoxError> {
                 postscript_name.as_deref().unwrap_or("Unknown")
             );
         }
+        let coords = instance
+            .coordinates
+            .iter()
+            .map(f32::from)
+            .collect::<Vec<_>>();
+        println!("    Coordinates: {:?}", coords);
+    }
+
+    println!("\nStyle Attributes:");
+    for table in stat_table.axis_value_tables() {
+        let table = table?;
+        dbg!(&table);
+        let name_id = table.value_name_id();
         println!(
-            "    Coordinates: {:?}",
-            instance
-                .coordinates
-                .iter()
-                .map(f32::from)
-                .collect::<Vec<_>>()
+            "{}",
+            name_table
+                .string_for_id(name_id)
+                .as_deref()
+                .unwrap_or("Unknown")
         );
     }
 
     Ok(())
-}
-
-fn english_name_for_name_id(name_table: &Option<NameTable>, name_id: u16) -> Option<String> {
-    name_table.as_ref().and_then(|name_table| {
-        name_table
-            .name_records
-            .iter()
-            .find_map(|record| {
-                if record.name_id != name_id {
-                    return None;
-                }
-                // Match English records
-                match (record.platform_id, record.encoding_id, record.language_id) {
-                    (0, _, _) => Some((record, UTF_16BE)),
-                    (1, 0, 0) => Some((record, MACINTOSH)),
-                    (
-                        3,
-                        1,
-                        0x0C09 | 0x2809 | 0x1009 | 0x2409 | 0x4009 | 0x1809 | 0x2009 | 0x4409
-                        | 0x1409 | 0x3409 | 0x4809 | 0x1C09 | 0x2C09 | 0x0809 | 0x0409 | 0x3009,
-                    ) => Some((record, UTF_16BE)),
-                    (
-                        3,
-                        10,
-                        0x0C09 | 0x2809 | 0x1009 | 0x2409 | 0x4009 | 0x1809 | 0x2009 | 0x4409
-                        | 0x1409 | 0x3409 | 0x4809 | 0x1C09 | 0x2C09 | 0x0809 | 0x0409 | 0x3009,
-                    ) => Some((record, UTF_16BE)),
-                    _ => None,
-                }
-            })
-            .and_then(|(record, encoding)| {
-                let offset = usize::from(record.offset);
-                let length = usize::from(record.length);
-                let name_data = name_table
-                    .string_storage
-                    .offset_length(offset, length)
-                    .ok()?
-                    .data();
-                Some(crate::decode(encoding, name_data))
-            })
-    })
 }
