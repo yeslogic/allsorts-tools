@@ -291,7 +291,7 @@ to be replaced by its special presentation form (glyph 547).
 
 ### From Source
 
-**Minimum Supported Rust Version:** Same as Allsorts
+**Minimum Supported Rust Version:** 1.70.0
 
 To build the tools ensure you have [Rust installed](https://www.rust-lang.org/tools/install).
 
