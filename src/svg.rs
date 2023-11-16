@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::str::FromStr;
+
 use allsorts::binary::read::ReadScope;
 use allsorts::cff::CFF;
 use allsorts::error::ParseError;
@@ -9,7 +12,8 @@ use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
-use allsorts::tables::{FontTableProvider, SfntVersion};
+use allsorts::tables::variable_fonts::fvar::FvarTable;
+use allsorts::tables::{Fixed, FontTableProvider, SfntVersion};
 use allsorts::{tag, Font};
 
 use crate::cli::SvgOpts;
@@ -21,8 +25,8 @@ const FONT_SIZE: f32 = 1000.0;
 
 pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     // Read and parse the font
+    let buffer = load_font_maybe_instance(&opts)?;
     let (script, lang) = script_and_lang_from_testcase(&opts.testcase);
-    let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
     let provider = font_file.table_provider(0)?;
@@ -108,5 +112,45 @@ fn script_and_lang_from_testcase(testcase: &str) -> (u32, u32) {
         )
     } else {
         (tag::LATN, tag::from_string("ENG ").unwrap())
+    }
+}
+
+fn load_font_maybe_instance(opts: &SvgOpts) -> Result<Vec<u8>, BoxError> {
+    let buffer = std::fs::read(&opts.font)?;
+    let scope = ReadScope::new(&buffer);
+    let font_file = scope.read::<FontData<'_>>()?;
+    let provider = font_file.table_provider(0)?;
+
+    if provider.has_table(tag::FVAR) && provider.has_table(tag::GVAR) {
+        // Construct the user tuple
+        // wght:28;wdth:100;opsz:72
+        let test_variations = dbg!(opts.variation.as_deref().unwrap_or(""))
+            .split(';')
+            .map(|pair| {
+                let (axis, value) = pair.split_once(':').expect("variation does no contain ':'");
+                let axis = tag::from_string(axis).expect("invalid axis tag");
+                let value = f64::from_str(value)
+                    .map(Fixed::from)
+                    .expect("invalid axis value");
+                (axis, value)
+            })
+            .collect::<HashMap<_, _>>();
+
+        let table = provider.read_table_data(tag::FVAR)?;
+        let fvar = ReadScope::new(&table).read::<FvarTable<'_>>()?;
+        let user_tuple = fvar
+            .axes()
+            .map(|axis| {
+                test_variations
+                    .get(&axis.axis_tag)
+                    .copied()
+                    .unwrap_or(axis.default_value)
+            })
+            .collect::<Vec<_>>();
+
+        allsorts::variations::instance(&provider, &user_tuple).map_err(BoxError::from)
+    } else {
+        drop(provider);
+        Ok(buffer)
     }
 }
