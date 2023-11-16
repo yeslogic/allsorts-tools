@@ -37,10 +37,12 @@ Available tools:
 * [`cmap`](#cmap) — print character to glyph mappings
 * [`dump`](#dump) — dump font information
 * [`has-table`](#has-table) — check if a font has a particular table
+* [`instance`](#instance) — create a static instance of a font from a variable font
 * [`layout-features`](#layout-features) — print a list of a font's GSUB and GPOS features
 * [`shape`](#shape) — apply shaping to glyphs from a font
 * [`subset`](#subset) — subset a font
 * [`validate`](#validate) — parse the supplied font, reporting any failures
+* [`variations`](#variations) — list the variation axes of a variable font
 * [`view`](#view) — generate SVGs from glyphs
 
 ### `bitmaps`
@@ -179,6 +181,24 @@ is found the path to the font is printed.
 
     find . -regextype posix-extended -type f -iregex '.*\.(ttf|otf|otc)$' -exec allsorts has-table -t EBLC -p {} \;
 
+### `instance`
+
+The `instance` tool applies a set of values (tuple) to the variation axes of a
+variable font to produce a static, non-variable font with those settings.
+
+#### Options
+
+* `-t, --tuple` is a comma separated list of values one for each variation axis
+  of the font. The `variations` tool will list the axes, their order, and limits.
+* `-o, --output` is the path to the output font.
+
+#### Example
+
+In this example the font has two axes: `UNDO` and `UNDS`. We supply a value of
+500 for each one and write the output font to `UnderlineTest.ttf`.
+
+    allsorts --tuple 500,500 UnderlineTest-VF.ttf -o UnderlineTest.ttf
+
 ### `layout-features`
 
 Prints an indented list of a font's GSUB and GPOS features.
@@ -248,6 +268,59 @@ large repertoire of real world fonts.
 
     $ fd '\.(ttf|otf|ttc)$' /usr/share/fonts | sort | parallel --bar allsorts validate {}
 
+### `variations`
+
+The `variations` tool lists information about a variable font. The information
+includes:
+
+- The variation axes and their tag, minimum, maximum, and default values.
+- Any pre-defined instances and their name and axis values.
+
+#### Example
+
+This example prints variation information for the font at
+`../text-rendering-tests/fonts/TestHVARTwo.ttf`.
+
+    $ allsorts variations ../text-rendering-tests/fonts/TestHVARTwo.ttf
+    Axes: (2)
+
+    - wght = min: 0, max: 1000, default: 0
+    - cntr = min: 0, max: 100, default: 0
+
+    Instances:
+
+          Subfamily: ExtraLight
+    PostScript Name: TestFont-ExtraLight
+    Coordinates: [0.0, 0.0]
+
+          Subfamily: Light
+    PostScript Name: TestFont-Light
+    Coordinates: [150.0, 0.0]
+
+          Subfamily: Regular
+    PostScript Name: TestFont-Regular
+    Coordinates: [394.0, 0.0]
+
+          Subfamily: Semibold
+    PostScript Name: TestFont-Semibold
+    Coordinates: [600.0, 0.0]
+
+          Subfamily: Bold
+    PostScript Name: TestFont-Bold
+    Coordinates: [824.0, 0.0]
+
+          Subfamily: Black
+    PostScript Name: TestFont-Black
+    Coordinates: [1000.0, 0.0]
+
+          Subfamily: Black Medium Contrast
+    PostScript Name: TestFont-BlackMediumContrast
+    Coordinates: [1000.0, 50.0]
+
+          Subfamily: Black High Contrast
+    PostScript Name: TestFont-BlackHighContrast
+    Coordinates: [1000.0, 100.0]
+
 ### `view`
 
 The `view` tool shapes the supplied text or list of codepoints according to the
@@ -276,7 +349,7 @@ supplied font, language, and script. Then, it generates an SVG of the glyphs.
 
 #### Example Using Codepoints
 
-    $ view -f fonts/devanagari/NotoSerifDevanagari-Regular.ttf -s deva -c '916,93f'
+    $ allsorts view -f fonts/devanagari/NotoSerifDevanagari-Regular.ttf -s deva -c '916,93f'
     # output omitted
 
 #### Example Using Glyph Indices (and Features)
