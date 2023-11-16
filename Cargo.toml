@@ -10,7 +10,6 @@ name = "allsorts"
 path = "src/main.rs"
 
 [dependencies]
-atty = "0.2.13"
 encoding_rs = "0.8.16"
 gumdrop = "0.7.0"
 png = "0.15.3"

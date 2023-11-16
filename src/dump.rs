@@ -1,9 +1,8 @@
 use std::borrow::Borrow;
 use std::convert::{self, TryFrom};
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::str;
 
-use atty::Stream;
 use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
 
 use allsorts::binary::read::ReadScope;
@@ -41,7 +40,7 @@ pub fn main(opts: DumpOpts) -> Result<i32, BoxError> {
         .table
         .map(|table| tag::from_string(&table))
         .transpose()?;
-    if table.is_some() && atty::is(Stream::Stdout) {
+    if table.is_some() && io::stdout().is_terminal() {
         return Err(ErrorMessage("Not printing binary data to tty.").into());
     }
 
