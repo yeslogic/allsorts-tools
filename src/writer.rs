@@ -150,7 +150,7 @@ impl<'a> GlyphName for CFF<'a> {
             return None;
         }
         let sid = font.charset.id_for_glyph(glyph_id)?;
-        self.read_string(sid).ok()
+        self.read_string(sid).map(ToString::to_string).ok()
     }
 }
 
@@ -159,7 +159,7 @@ impl<'a> GlyphName for GlyfPost<'a> {
         self.post
             .as_ref()
             .and_then(|post| post.glyph_name(glyph_id).ok().flatten())
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
     }
 }
 
