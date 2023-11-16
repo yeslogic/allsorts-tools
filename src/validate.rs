@@ -56,7 +56,7 @@ fn dump_glyphs(path: &str, provider: &impl FontTableProvider) -> Result<bool, Pa
         let scope = ReadScope::new(table.borrow());
         let mut glyf = scope.read_dep::<GlyfTable>(&loca)?;
 
-        for (index, glyph) in glyf.records.iter_mut().enumerate() {
+        for (index, glyph) in glyf.records_mut().iter_mut().enumerate() {
             match glyph.parse() {
                 Ok(()) => (),
                 Err(err) => {

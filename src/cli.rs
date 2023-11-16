@@ -27,6 +27,9 @@ pub enum Command {
     #[options(help = "check if a font has a particular table")]
     HasTable(HasTableOpts),
 
+    #[options(help = "create a static instance from a variable font")]
+    Instance(InstanceOpts),
+
     #[options(help = "print a list of a font's GSUB and GPOS features")]
     LayoutFeatures(LayoutFeaturesOpts),
 
@@ -43,6 +46,9 @@ pub enum Command {
 
     #[options(help = "parse the supplied font, reporting any failures")]
     Validate(ValidateOpts),
+
+    #[options(help = "print a list of a font's variations")]
+    Variations(VariationsOpts),
 
     #[options(help = "output an SVG rendition of the supplied text")]
     View(ViewOpts),
@@ -158,6 +164,30 @@ pub struct HasTableOpts {
 }
 
 #[derive(Debug, Options)]
+pub struct InstanceOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
+    // FIXME: better description
+    // TODO: allow specifying the name of a STAT instance
+    #[options(help = "comma-separated list of user-tuple values", meta = "TUPLE")]
+    pub tuple: String,
+
+    #[options(required, help = "path to destination font")]
+    pub output: String,
+
+    #[options(free, required, help = "path to input variable font file")]
+    pub font: String,
+}
+
+#[derive(Debug, Options)]
 pub struct LayoutFeaturesOpts {
     #[options(help = "print help message")]
     pub help: bool,
@@ -245,6 +275,9 @@ pub struct SvgOpts {
     #[options(help = "name of test case", meta = "NAME", default = "allsorts")]
     pub testcase: String,
 
+    #[options(help = "variation settings for test case", meta = "AXES")]
+    pub variation: Option<String>,
+
     #[options(required, help = "text to render", meta = "TEXT")]
     pub render: String,
 
@@ -258,6 +291,22 @@ pub struct ValidateOpts {
     pub help: bool,
 
     #[options(free, required, help = "path to font")]
+    pub font: String,
+}
+
+#[derive(Debug, Options)]
+pub struct VariationsOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
+    #[options(free, required, help = "path to font file")]
     pub font: String,
 }
 
