@@ -27,6 +27,9 @@ pub enum Command {
     #[options(help = "check if a font has a particular table")]
     HasTable(HasTableOpts),
 
+    #[options(help = "create a static instance from a variable font")]
+    Instance(InstanceOpts),
+
     #[options(help = "print a list of a font's GSUB and GPOS features")]
     LayoutFeatures(LayoutFeaturesOpts),
 
@@ -158,6 +161,30 @@ pub struct HasTableOpts {
 
     #[options(free, required, help = "paths of fonts to check")]
     pub fonts: Vec<OsString>,
+}
+
+#[derive(Debug, Options)]
+pub struct InstanceOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(
+        help = "index of the font to dump (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: usize,
+
+    // FIXME: better description
+    // TODO: allow specifying the name of a STAT instance
+    #[options(help = "comma-separated list of user-tuple values", meta = "TUPLE")]
+    pub tuple: String,
+
+    #[options(required, help = "path to destination font")]
+    pub output: String,
+
+    #[options(free, required, help = "path to input variable font file")]
+    pub font: String,
 }
 
 #[derive(Debug, Options)]
