@@ -4,6 +4,7 @@ pub mod cmap;
 pub mod dump;
 mod glyph;
 pub mod has_table;
+pub mod instance;
 pub mod layout_features;
 mod script;
 pub mod shape;
