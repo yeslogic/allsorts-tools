@@ -275,6 +275,9 @@ pub struct SvgOpts {
     #[options(help = "name of test case", meta = "NAME", default = "allsorts")]
     pub testcase: String,
 
+    #[options(help = "variation settings for test case", meta = "AXES")]
+    pub variation: Option<String>,
+
     #[options(required, help = "text to render", meta = "TEXT")]
     pub render: String,
 
