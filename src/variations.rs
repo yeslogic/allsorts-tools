@@ -29,8 +29,11 @@ fn print_variations(provider: &impl FontTableProvider) -> Result<(), BoxError> {
 
     let name_table_data = provider.read_table_data(tag::NAME)?;
     let name_table = ReadScope::new(&name_table_data).read::<NameTable>()?;
-    let stat_table_data = provider.read_table_data(tag::STAT)?;
-    let stat_table = ReadScope::new(&stat_table_data).read::<StatTable>()?;
+    let stat_table_data = provider.table_data(tag::STAT)?;
+    let stat_table = stat_table_data
+        .as_ref()
+        .map(|stat_data| ReadScope::new(stat_data).read::<StatTable<'_>>())
+        .transpose()?;
 
     println!("Axes: ({})\n", fvar.axes().count());
     for axis in fvar.axes() {
@@ -68,18 +71,19 @@ fn print_variations(provider: &impl FontTableProvider) -> Result<(), BoxError> {
         println!("    Coordinates: {:?}", coords);
     }
 
-    println!("\nStyle Attributes:");
-    for table in stat_table.axis_value_tables() {
-        let table = table?;
-        dbg!(&table);
-        let name_id = table.value_name_id();
-        println!(
-            "{}",
-            name_table
-                .string_for_id(name_id)
-                .as_deref()
-                .unwrap_or("Unknown")
-        );
+    if let Some(stat) = stat_table {
+        println!("\nStyle Attributes:");
+        for table in stat.axis_value_tables() {
+            let table = table?;
+            let name_id = table.value_name_id();
+            println!(
+                "{}",
+                name_table
+                    .string_for_id(name_id)
+                    .as_deref()
+                    .unwrap_or("Unknown")
+            );
+        }
     }
 
     Ok(())

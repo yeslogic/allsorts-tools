@@ -175,6 +175,7 @@ impl<'a> OutlineBuilder for GlyfPost<'a> {
     }
 }
 
+#[derive(Clone)]
 pub enum SVGMode {
     /// SVGs are being generated to comply with the expected output of the
     /// [Unicode text rendering tests](https://github.com/unicode-org/text-rendering-tests).
@@ -199,6 +200,7 @@ pub struct SVGWriter {
 struct Symbols<'info> {
     transform: Matrix2x2F,
     symbols: Vec<Symbol<'info>>,
+    mode: SVGMode,
 }
 
 impl SVGWriter {
@@ -249,6 +251,7 @@ impl SVGWriter {
         let mut symbols = Symbols {
             transform: self.transform,
             symbols: Vec::new(),
+            mode: self.mode.clone(),
         };
         let mut symbol_map = HashMap::new();
         for (info, pos) in iter {
@@ -505,44 +508,79 @@ impl<'info> Symbol<'info> {
     }
 }
 
+// When rendering in TextRenderingTests mode the paths are "normalised" by
+// truncating them. The matches what the other test harnesses do and makes the
+// output SVGs match the expectations, which have had the same treatment.
 impl<'info> OutlineSink for Symbols<'info> {
     fn move_to(&mut self, point: Vector2F) {
         let point = self.transform * point;
-        self.current_path()
-            .push_str(&format!(" M{},{}", point.x(), point.y()));
+        let path = match self.mode {
+            SVGMode::TextRenderingTests(_) => {
+                format!(" M{},{}", point.x() as i32, point.y() as i32)
+            }
+            SVGMode::View { .. } => format!(" M{},{}", point.x(), point.y()),
+        };
+        self.current_path().push_str(&path);
     }
 
     fn line_to(&mut self, point: Vector2F) {
         let point = self.transform * point;
-        self.current_path()
-            .push_str(&format!(" L{},{}", point.x(), point.y()));
+        let path = match self.mode {
+            SVGMode::TextRenderingTests(_) => {
+                format!(" L{},{}", point.x() as i32, point.y() as i32)
+            }
+            SVGMode::View { .. } => format!(" L{},{}", point.x(), point.y()),
+        };
+        self.current_path().push_str(&path);
     }
 
     fn quadratic_curve_to(&mut self, control: Vector2F, point: Vector2F) {
         let control = self.transform * control;
         let point = self.transform * point;
-        self.current_path().push_str(&format!(
-            " Q{},{} {},{}",
-            control.x(),
-            control.y(),
-            point.x(),
-            point.y()
-        ));
+        let path = match self.mode {
+            SVGMode::TextRenderingTests(_) => format!(
+                " Q{},{} {},{}",
+                control.x() as i32,
+                control.y() as i32,
+                point.x() as i32,
+                point.y() as i32
+            ),
+            SVGMode::View { .. } => format!(
+                " Q{},{} {},{}",
+                control.x(),
+                control.y(),
+                point.x(),
+                point.y()
+            ),
+        };
+        self.current_path().push_str(&path);
     }
 
     fn cubic_curve_to(&mut self, ctrl: LineSegment2F, to: Vector2F) {
         let ctrl_from = self.transform * ctrl.from();
         let ctrl_to = self.transform * ctrl.to();
         let to = self.transform * to;
-        self.current_path().push_str(&format!(
-            " C{},{} {},{} {},{}",
-            ctrl_from.x(),
-            ctrl_from.y(),
-            ctrl_to.x(),
-            ctrl_to.y(),
-            to.x(),
-            to.y()
-        ));
+        let path = match self.mode {
+            SVGMode::TextRenderingTests(_) => format!(
+                " C{},{} {},{} {},{}",
+                ctrl_from.x() as i32,
+                ctrl_from.y() as i32,
+                ctrl_to.x() as i32,
+                ctrl_to.y() as i32,
+                to.x() as i32,
+                to.y() as i32
+            ),
+            SVGMode::View { .. } => format!(
+                " C{},{} {},{} {},{}",
+                ctrl_from.x(),
+                ctrl_from.y(),
+                ctrl_to.x(),
+                ctrl_to.y(),
+                to.x(),
+                to.y()
+            ),
+        };
+        self.current_path().push_str(&path);
     }
 
     fn close(&mut self) {
