@@ -3,10 +3,11 @@ use allsorts::font::{Font, MatchingPresentation};
 use allsorts::font_data::FontData;
 use allsorts::glyph_position::{GlyphLayout, TextDirection};
 use allsorts::gsub::{FeatureMask, Features};
+use allsorts::tables::variable_fonts::OwnedTuple;
 use allsorts::tag;
 
 use crate::cli::ShapeOpts;
-use crate::BoxError;
+use crate::{normalise_tuple, parse_tuple, BoxError};
 
 pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
     let script = tag::from_string(&opts.script)?;
@@ -15,6 +16,19 @@ pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
     let provider = font_file.table_provider(opts.index)?;
+
+    let user_tuple = opts.tuple.as_deref().map(parse_tuple).transpose()?;
+    let tuple = match user_tuple {
+        Some(user_tuple) => match normalise_tuple(&provider, &user_tuple) {
+            Ok(tuple) => Some(tuple),
+            Err(err) => {
+                eprintln!("unable to normalise variation tuple: {err}");
+                return Ok(1);
+            }
+        },
+        None => None,
+    };
+
     let mut font = match Font::new(Box::new(provider))? {
         Some(font) => font,
         None => {
@@ -29,6 +43,7 @@ pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
             script,
             Some(lang),
             &Features::Mask(FeatureMask::default()),
+            tuple.as_ref().map(OwnedTuple::as_tuple),
             true,
         )
         .map_err(|(err, _infos)| err)?;

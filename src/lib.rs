@@ -17,7 +17,15 @@ mod writer;
 
 use std::error::Error;
 use std::fmt;
+use std::num::ParseFloatError;
 
+use allsorts::binary::read::ReadScope;
+use allsorts::error::ParseError;
+use allsorts::tables::variable_fonts::avar::AvarTable;
+use allsorts::tables::variable_fonts::fvar::FvarTable;
+use allsorts::tables::variable_fonts::OwnedTuple;
+use allsorts::tables::{Fixed, FontTableProvider};
+use allsorts::tag;
 use encoding_rs::Encoding;
 
 pub type BoxError = Box<dyn Error>;
@@ -43,4 +51,28 @@ pub(crate) fn decode(encoding: &'static Encoding, data: &[u8]) -> String {
     } else {
         String::new() // can only happen if buffer is enormous
     }
+}
+
+fn parse_tuple(tuple: &str) -> Result<Vec<Fixed>, ParseFloatError> {
+    tuple
+        .split(',')
+        .map(|s| s.trim().parse::<f32>().map(Fixed::from))
+        .collect()
+}
+
+fn normalise_tuple(
+    provider: &impl FontTableProvider,
+    tuple: &[Fixed],
+) -> Result<OwnedTuple, ParseError> {
+    let fvar_data = provider
+        .table_data(tag::FVAR)?
+        .ok_or(ParseError::MissingValue)?;
+    let fvar = ReadScope::new(&fvar_data).read::<FvarTable>()?;
+    let avar_data = provider.table_data(tag::AVAR)?;
+    let avar = avar_data
+        .as_ref()
+        .map(|data| ReadScope::new(data).read::<AvarTable>())
+        .transpose()?;
+
+    fvar.normalize(tuple.iter().copied(), avar.as_ref())
 }

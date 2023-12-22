@@ -47,13 +47,12 @@ dependencies = [
 [[package]]
 name = "allsorts"
 version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "256467e8518f46b4ddbebd7cb8df2add04a720e3a6bdd0800c3896a5fc97ae3a"
 dependencies = [
  "bitflags",
  "bitreader",
  "brotli-decompressor",
  "byteorder",
+ "crc32fast",
  "encoding_rs",
  "flate2",
  "glyph-names",
