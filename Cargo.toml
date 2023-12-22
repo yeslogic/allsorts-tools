@@ -17,6 +17,7 @@ xmlwriter = "0.1.0"
 
 [dependencies.allsorts]
 version = "0.14.1"
+path = "../prince/src/fonts/allsorts"
 
 [dev-dependencies]
 assert_cmd = "1"

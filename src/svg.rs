@@ -13,6 +13,7 @@ use allsorts::post::PostTable;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::variable_fonts::fvar::FvarTable;
+use allsorts::tables::variable_fonts::OwnedTuple;
 use allsorts::tables::{Fixed, FontTableProvider, SfntVersion};
 use allsorts::{tag, Font};
 
@@ -25,11 +26,13 @@ const FONT_SIZE: f32 = 1000.0;
 
 pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     // Read and parse the font
-    let buffer = load_font_maybe_instance(&opts)?;
+    let (buffer, tuple) = load_font_maybe_instance(&opts)?;
     let (script, lang) = script_and_lang_from_testcase(&opts.testcase);
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
     let provider = font_file.table_provider(0)?;
+
+    // Map text to glyphs and then apply font shaping
     let mut font = match Font::new(provider)? {
         Some(font) => font,
         None => {
@@ -37,8 +40,6 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             return Ok(1);
         }
     };
-
-    // Map text to glyphs and then apply font shaping
     let glyphs = font.map_glyphs(&opts.render, script, MatchingPresentation::NotRequired);
     let infos = font
         .shape(
@@ -46,6 +47,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             script,
             Some(lang),
             &Features::Mask(FeatureMask::default()),
+            tuple.as_ref().map(OwnedTuple::as_tuple),
             true,
         )
         .map_err(|(err, _infos)| err)?;
@@ -115,7 +117,7 @@ fn script_and_lang_from_testcase(testcase: &str) -> (u32, u32) {
     }
 }
 
-fn load_font_maybe_instance(opts: &SvgOpts) -> Result<Vec<u8>, BoxError> {
+fn load_font_maybe_instance(opts: &SvgOpts) -> Result<(Vec<u8>, Option<OwnedTuple>), BoxError> {
     let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
@@ -148,9 +150,11 @@ fn load_font_maybe_instance(opts: &SvgOpts) -> Result<Vec<u8>, BoxError> {
             })
             .collect::<Vec<_>>();
 
-        allsorts::variations::instance(&provider, &user_tuple).map_err(BoxError::from)
+        allsorts::variations::instance(&provider, &user_tuple)
+            .map(|(font, tuple)| (font, Some(tuple)))
+            .map_err(BoxError::from)
     } else {
         drop(provider);
-        Ok(buffer)
+        Ok((buffer, None))
     }
 }

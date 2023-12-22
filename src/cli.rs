@@ -175,7 +175,6 @@ pub struct InstanceOpts {
     )]
     pub index: usize,
 
-    // FIXME: better description
     // TODO: allow specifying the name of a STAT instance
     #[options(help = "comma-separated list of user-tuple values", meta = "TUPLE")]
     pub tuple: String,
@@ -227,6 +226,9 @@ pub struct ShapeOpts {
 
     #[options(free, required, help = "text to shape")]
     pub text: String,
+
+    #[options(help = "comma-separated list of user-tuple values", meta = "TUPLE")]
+    pub tuple: Option<String>,
 
     #[options(help = "vertical layout, default horizontal", no_short)]
     pub vertical: bool,
@@ -306,6 +308,9 @@ pub struct VariationsOpts {
     )]
     pub index: usize,
 
+    #[options(help = "output a HTML test file alongside the font")]
+    pub test: bool,
+
     #[options(free, required, help = "path to font file")]
     pub font: String,
 }
@@ -374,4 +379,7 @@ pub struct ViewOpts {
         meta = "FEATURES"
     )]
     pub features: Option<String>,
+
+    #[options(help = "comma-separated list of user-tuple values", meta = "TUPLE")]
+    pub tuple: Option<String>,
 }
