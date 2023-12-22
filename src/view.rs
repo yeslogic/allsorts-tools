@@ -9,14 +9,15 @@ use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
+use allsorts::tables::variable_fonts::OwnedTuple;
 use allsorts::tables::{FontTableProvider, SfntVersion};
 use allsorts::tag;
 use allsorts::tinyvec::tiny_vec;
 
 use crate::cli::ViewOpts;
-use crate::script;
 use crate::writer::{GlyfPost, SVGMode, SVGWriter};
 use crate::BoxError;
+use crate::{normalise_tuple, parse_tuple, script};
 
 const FONT_SIZE: f32 = 1000.0;
 
@@ -44,6 +45,19 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
     let provider = font_file.table_provider(0)?;
+
+    let user_tuple = opts.tuple.as_deref().map(parse_tuple).transpose()?;
+    let tuple = match user_tuple {
+        Some(user_tuple) => match normalise_tuple(&provider, &user_tuple) {
+            Ok(tuple) => Some(tuple),
+            Err(err) => {
+                eprintln!("unable to normalise variation tuple: {err}");
+                return Ok(1);
+            }
+        },
+        None => None,
+    };
+
     let mut font = match Font::new(provider)? {
         Some(font) => font,
         None => {
@@ -64,7 +78,14 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     };
 
     let infos = font
-        .shape(glyphs, script, lang, &features, true)
+        .shape(
+            glyphs,
+            script,
+            lang,
+            &features,
+            tuple.as_ref().map(OwnedTuple::as_tuple),
+            true,
+        )
         .map_err(|(err, _infos)| err)?;
     let direction = script::direction(script);
 

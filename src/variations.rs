@@ -1,10 +1,15 @@
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+
 use allsorts::binary::read::ReadScope;
-use allsorts::font_data::FontData;
-use allsorts::tables::variable_fonts::fvar::FvarTable;
+use allsorts::font_data::{DynamicFontTableProvider, FontData};
+use allsorts::tables::variable_fonts::fvar::{FvarTable, InstanceRecord, VariationAxisRecord};
 use allsorts::tables::variable_fonts::stat::StatTable;
 use allsorts::tables::{FontTableProvider, NameTable};
 use allsorts::tag;
 use allsorts::tag::DisplayTag;
+use allsorts::variations::VariationError;
 
 use crate::cli::VariationsOpts;
 use crate::BoxError;
@@ -14,7 +19,12 @@ pub fn main(opts: VariationsOpts) -> Result<i32, BoxError> {
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData>()?;
     let provider = font_file.table_provider(opts.index)?;
-    print_variations(&provider)?;
+
+    if opts.test {
+        generate_test(&provider, &opts.font)?;
+    } else {
+        print_variations(&provider)?;
+    }
 
     Ok(0)
 }
@@ -87,4 +97,83 @@ fn print_variations(provider: &impl FontTableProvider) -> Result<(), BoxError> {
     }
 
     Ok(())
+}
+
+fn generate_test(provider: &DynamicFontTableProvider, font: &str) -> Result<(), BoxError> {
+    if !(provider.has_table(tag::FVAR) && provider.has_table(tag::GVAR)) {
+        println!("Font does have both fvar and gvar");
+        return Ok(());
+    }
+
+    let fvar_data = provider.read_table_data(tag::FVAR)?;
+    let scope = ReadScope::new(&fvar_data);
+    let fvar = scope.read::<FvarTable>()?;
+
+    let name_table_data = provider.read_table_data(tag::NAME)?;
+    let name = ReadScope::new(&name_table_data).read::<NameTable>()?;
+
+    let output_path = font.to_string() + ".html";
+    let mut out = File::create(&output_path)?;
+    let axes = fvar.axes().collect::<Vec<_>>();
+    let typographic_family = name
+        .string_for_id(NameTable::TYPOGRAPHIC_FAMILY_NAME)
+        .or_else(|| name.string_for_id(NameTable::FONT_FAMILY_NAME))
+        .ok_or(VariationError::NameError)?;
+
+    writeln!(
+        out,
+        "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<style>"
+    )?;
+    let mut spans = Vec::new();
+    for instance in fvar.instances() {
+        let instance = instance?;
+        let subfamily = name
+            .string_for_id(instance.subfamily_name_id)
+            .ok_or_else(|| "instance has no subfamily name")?;
+        let font_family = format!("{typographic_family} {subfamily}");
+        let src = Path::new(font)
+            .file_name()
+            .and_then(|src| src.to_str())
+            .ok_or_else(|| "unable to get filename of font")?;
+        let font_face = font_face(&axes, &font_family, src, &instance);
+        writeln!(out, "{font_face}")?;
+
+        let span = format!(
+            r#"<p style="font-family: '{font_family}', sans-serif">mix Zapf with Veljović and get quirky Béziers</p>"#
+        );
+        spans.push(span);
+    }
+    writeln!(out, "body {{ font-size: 18pt }}\n</style>\n<title>{typographic_family} Test</title>\n</head>\n<body>")?;
+    let text = spans.join("\n");
+    writeln!(out, "{text}")?;
+    writeln!(out, "</body>\n</html>")?;
+
+    println!("Wrote: {output_path}");
+    Ok(())
+}
+
+fn font_face(
+    axes: &[VariationAxisRecord],
+    font_family: &str,
+    src: &str,
+    instance: &InstanceRecord,
+) -> String {
+    let font_variation_settings = instance
+        .coordinates
+        .iter()
+        .zip(axes)
+        .map(|(coord, axis)| format!("'{}' {}", DisplayTag(axis.axis_tag), f32::from(coord)))
+        .collect::<Vec<_>>();
+    let font_variation_settings = font_variation_settings.join(", ");
+
+    format!(
+        r#"@font-face {{
+    font-family: "{font_family}";
+    src: url("{src}");
+    font-weight: normal;
+    font-style: normal;
+    font-stretch: normal;
+    font-variation-settings: {font_variation_settings};
+}}"#,
+    )
 }
