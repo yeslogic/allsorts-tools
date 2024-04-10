@@ -277,9 +277,6 @@ pub struct SvgOpts {
     #[options(help = "name of test case", meta = "NAME", default = "allsorts")]
     pub testcase: String,
 
-    #[options(help = "comma-separated list of user-tuple values", meta = "TUPLE")]
-    pub tuple: Option<String>,
-
     #[options(help = "variation settings for test case", meta = "AXES")]
     pub variation: Option<String>,
 

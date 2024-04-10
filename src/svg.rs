@@ -18,31 +18,19 @@ use allsorts::tables::{Fixed, FontTableProvider, SfntVersion};
 use allsorts::{tag, Font};
 
 use crate::cli::SvgOpts;
+use crate::script;
 use crate::writer::{GlyfPost, SVGMode, SVGWriter};
 use crate::BoxError;
-use crate::{normalise_tuple, parse_tuple, script};
 
 const FONT_SIZE: f32 = 1000.0;
 
 pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     // Read and parse the font
-    let buffer = load_font_maybe_instance(&opts)?;
+    let (buffer, tuple) = load_font_maybe_instance(&opts)?;
     let (script, lang) = script_and_lang_from_testcase(&opts.testcase);
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
     let provider = font_file.table_provider(0)?;
-
-    let user_tuple = opts.tuple.as_deref().map(parse_tuple).transpose()?;
-    let tuple = match user_tuple {
-        Some(user_tuple) => match normalise_tuple(&provider, &user_tuple) {
-            Ok(tuple) => Some(tuple),
-            Err(err) => {
-                eprintln!("unable to normalise variation tuple: {err}");
-                return Ok(1);
-            }
-        },
-        None => None,
-    };
 
     // Map text to glyphs and then apply font shaping
     let mut font = match Font::new(provider)? {
@@ -129,7 +117,7 @@ fn script_and_lang_from_testcase(testcase: &str) -> (u32, u32) {
     }
 }
 
-fn load_font_maybe_instance(opts: &SvgOpts) -> Result<Vec<u8>, BoxError> {
+fn load_font_maybe_instance(opts: &SvgOpts) -> Result<(Vec<u8>, Option<OwnedTuple>), BoxError> {
     let buffer = std::fs::read(&opts.font)?;
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
@@ -163,10 +151,10 @@ fn load_font_maybe_instance(opts: &SvgOpts) -> Result<Vec<u8>, BoxError> {
             .collect::<Vec<_>>();
 
         allsorts::variations::instance(&provider, &user_tuple)
-            .map(|(font, _tuple)| font)
+            .map(|(font, tuple)| (font, Some(tuple)))
             .map_err(BoxError::from)
     } else {
         drop(provider);
-        Ok(buffer)
+        Ok((buffer, None))
     }
 }
