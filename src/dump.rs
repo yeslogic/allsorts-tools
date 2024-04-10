@@ -6,7 +6,7 @@ use std::str;
 use encoding_rs::{MACINTOSH, UTF_16BE};
 
 use allsorts::binary::read::ReadScope;
-use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
+use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operand, Operator, CFF};
 use allsorts::error::ParseError;
 use allsorts::font::read_cmap_subtable;
 use allsorts::font_data::FontData;
@@ -377,18 +377,12 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
         println!(" - name: {}", name);
     }
 
-    if cff.name_index.count != 1 {
+    if cff.name_index.len() != 1 {
         return Err(ParseError::BadIndex);
     }
     let font = cff.fonts.get(0).ok_or(ParseError::MissingValue)?;
-    let char_strings_offset = font
-        .top_dict
-        .get_i32(Operator::CharStrings)
-        .ok_or(ParseError::MissingValue)??;
-    let char_strings_index = scope
-        .offset(usize::try_from(char_strings_offset)?)
-        .read::<cff::Index<'_>>()?;
-    println!(" - num glyphs: {}", char_strings_index.count);
+    let char_strings_index = &font.char_strings_index;
+    println!(" - num glyphs: {}", char_strings_index.len());
     println!(
         " - charset: {}",
         match font.charset {
@@ -407,9 +401,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     );
     println!();
     println!(" - Top DICT");
-    for (op, operands) in font.top_dict.iter() {
-        println!("  - {:?}: {:?}", op, operands);
-    }
+    dump_cff_dict(&cff, &font.top_dict, 2);
     match &font.data {
         CFFVariant::Type1(ref type1) => {
             println!();
@@ -423,9 +415,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
             );
             println!();
             println!(" - Private DICT");
-            for (op, operands) in type1.private_dict.iter() {
-                println!("  - {:?}: {:?}", op, operands);
-            }
+            dump_cff_dict(&cff, &type1.private_dict, 2);
             let (subrs_count, subrs_size) = match type1.local_subr_index {
                 Some(ref index) => (index.len(), index.data_len()),
                 None => (0, 0),
@@ -436,17 +426,13 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
             for (i, object) in cid.font_dict_index.iter().enumerate() {
                 println!();
                 println!(" - Font DICT {}", i);
-                let font_dict = ReadScope::new(object).read::<FontDict>()?;
-                for (op, operands) in font_dict.iter() {
-                    println!("  - {:?}: {:?}", op, operands);
-                }
-
+                let font_dict = ReadScope::new(object).read_dep::<FontDict>(cff::MAX_OPERANDS)?;
+                dump_cff_dict(&cff, &font_dict, 2);
                 println!();
                 println!("  - Private DICT");
-                let (private_dict, _private_dict_offset) = font_dict.read_private_dict(&scope)?;
-                for (op, operands) in private_dict.iter() {
-                    println!("   - {:?}: {:?}", op, operands);
-                }
+                let (private_dict, _private_dict_offset) =
+                    font_dict.read_private_dict::<cff::PrivateDict>(&scope, cff::MAX_OPERANDS)?;
+                dump_cff_dict(&cff, &private_dict, 4);
             }
             let (subrs_count, subrs_size) =
                 cid.local_subr_indices
@@ -503,6 +489,45 @@ fn dump_glyph(provider: &impl FontTableProvider, glyph_id: u16) -> Result<(), Pa
     println!("{:#?}", glyph);
 
     Ok(())
+}
+
+fn dump_cff_dict<T: cff::DictDefault>(cff: &CFF, dict: &cff::Dict<T>, indent: usize) {
+    for x in dict.iter().map(|(op, ops)| (op, ops.as_slice())) {
+        match x {
+            // For operators with a string id operand, resolve the string
+            (op @ Operator::Version, &[Operand::Integer(sid)])
+            | (op @ Operator::Notice, &[Operand::Integer(sid)])
+            | (op @ Operator::Copyright, &[Operand::Integer(sid)])
+            | (op @ Operator::FullName, &[Operand::Integer(sid)])
+            | (op @ Operator::FamilyName, &[Operand::Integer(sid)])
+            | (op @ Operator::Weight, &[Operand::Integer(sid)])
+            | (op @ Operator::BaseFontName, &[Operand::Integer(sid)]) => {
+                let string = u16::try_from(sid)
+                    .ok()
+                    .and_then(|sid| cff.read_string(sid).ok())
+                    .unwrap_or("<unable to read>");
+                println!("{:indent$}- {:?}: {}", " ", op, string);
+            }
+            (
+                op @ Operator::ROS,
+                &[Operand::Integer(registry), Operand::Integer(ordering), Operand::Integer(supplement)],
+            ) => {
+                let registry = u16::try_from(registry)
+                    .ok()
+                    .and_then(|sid| cff.read_string(sid).ok())
+                    .unwrap_or("<unable to read>");
+                let ordering = u16::try_from(ordering)
+                    .ok()
+                    .and_then(|sid| cff.read_string(sid).ok())
+                    .unwrap_or("<unable to read>");
+                println!(
+                    "{:indent$}- {:?}: {}-{}-{}",
+                    " ", op, registry, ordering, supplement
+                );
+            }
+            (op, operands) => println!("{:indent$}- {:?}: {:?}", " ", op, operands),
+        }
+    }
 }
 
 fn dump_raw_table(scope: Option<ReadScope>) -> Result<(), BoxError> {
