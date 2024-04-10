@@ -100,8 +100,12 @@ fn print_variations(provider: &impl FontTableProvider) -> Result<(), BoxError> {
 }
 
 fn generate_test(provider: &DynamicFontTableProvider, font: &str) -> Result<(), BoxError> {
-    if !(provider.has_table(tag::FVAR) && provider.has_table(tag::GVAR)) {
-        println!("Font does have both fvar and gvar");
+    if !provider.has_table(tag::FVAR) {
+        println!("Font does have fvar");
+        return Ok(());
+    }
+    if !(provider.has_table(tag::CFF2) || provider.has_table(tag::GVAR)) {
+        println!("Font does have gvar or CFF2");
         return Ok(());
     }
 
