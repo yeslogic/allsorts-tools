@@ -1,6 +1,8 @@
 use std::borrow::Borrow;
+use std::convert::TryFrom;
 
 use allsorts::binary::read::ReadScope;
+use allsorts::cff::Operator;
 use allsorts::error::ParseError;
 use allsorts::font_data::FontData;
 use allsorts::tables::glyf::GlyfTable;
@@ -10,7 +12,6 @@ use allsorts::tag;
 
 use crate::cli::ValidateOpts;
 use crate::BoxError;
-use std::convert::TryFrom;
 
 pub fn main(opts: ValidateOpts) -> Result<i32, BoxError> {
     let buffer = std::fs::read(&opts.font)?;
@@ -71,10 +72,10 @@ fn dump_glyphs(path: &str, provider: &impl FontTableProvider) -> Result<bool, Pa
 }
 
 fn check_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
-    use allsorts::cff::{self, CFFVariant, FontDict, Operator, CFF};
+    use allsorts::cff::{self, CFFVariant, FontDict, CFF};
 
     let cff = scope.read::<CFF>()?;
-    if cff.name_index.count != 1 {
+    if cff.name_index.len() != 1 {
         return Err(ParseError::BadIndex);
     }
     let font = cff.fonts.get(0).ok_or(ParseError::MissingValue)?;
@@ -84,13 +85,14 @@ fn check_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
         .ok_or(ParseError::MissingValue)??;
     let _char_strings_index = scope
         .offset(usize::try_from(char_strings_offset)?)
-        .read::<cff::Index<'_>>()?;
+        .read::<cff::IndexU16>()?;
     match &font.data {
         CFFVariant::Type1(ref _type1) => {}
         CFFVariant::CID(cid) => {
             for (_i, object) in cid.font_dict_index.iter().enumerate() {
-                let font_dict = ReadScope::new(object).read::<FontDict>()?;
-                let (_private_dict, _private_dict_offset) = font_dict.read_private_dict(&scope)?;
+                let font_dict = ReadScope::new(object).read_dep::<FontDict>(cff::MAX_OPERANDS)?;
+                let (_private_dict, _private_dict_offset) =
+                    font_dict.read_private_dict::<cff::PrivateDict>(&scope, cff::MAX_OPERANDS)?;
             }
         }
     }
