@@ -15,7 +15,7 @@ use allsorts::tag;
 use allsorts::tinyvec::tiny_vec;
 
 use crate::cli::ViewOpts;
-use crate::writer::{GlyfPost, SVGMode, SVGWriter};
+use crate::writer::{NamedOutliner, SVGMode, SVGWriter};
 use crate::BoxError;
 use crate::{normalise_tuple, parse_tuple, script};
 
@@ -117,7 +117,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
             .as_ref()
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
-        let mut glyf_post = GlyfPost { glyf, post };
+        let mut glyf_post = NamedOutliner { table: glyf, post };
         let writer = SVGWriter::new(mode, transform);
         writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction)?
     } else {

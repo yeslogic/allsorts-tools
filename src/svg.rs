@@ -2,10 +2,12 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use allsorts::binary::read::ReadScope;
+use allsorts::cff::cff2::CFF2;
+use allsorts::cff::outline::CFF2Outlines;
 use allsorts::cff::CFF;
 use allsorts::error::ParseError;
 use allsorts::font::{GlyphTableFlags, MatchingPresentation};
-use allsorts::font_data::FontData;
+use allsorts::font_data::{DynamicFontTableProvider, FontData};
 use allsorts::gsub::{FeatureMask, Features};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
@@ -19,7 +21,7 @@ use allsorts::{tag, Font};
 
 use crate::cli::SvgOpts;
 use crate::script;
-use crate::writer::{GlyfPost, SVGMode, SVGWriter};
+use crate::writer::{NamedOutliner, SVGMode, SVGWriter};
 use crate::BoxError;
 
 const FONT_SIZE: f32 = 1000.0;
@@ -71,6 +73,27 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
         let mut cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
         let writer = SVGWriter::new(SVGMode::TextRenderingTests(opts.testcase), transform);
         writer.glyphs_to_svg(&mut cff, &mut font, &infos, direction)?
+    } else if font.glyph_table_flags.contains(GlyphTableFlags::CFF2)
+        && provider.sfnt_version() == tag::OTTO
+    {
+        let cff_data = provider.read_table_data(tag::CFF2)?;
+        let cff = ReadScope::new(&cff_data).read::<CFF2<'_>>()?;
+        let post_data = provider.table_data(tag::POST)?;
+        let post = post_data
+            .as_ref()
+            .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
+            .transpose()?;
+
+        let cff2_outlines = CFF2Outlines {
+            table: &cff,
+            tuple: None,
+        };
+        let mut cff2_post = NamedOutliner {
+            table: cff2_outlines,
+            post,
+        };
+        let writer = SVGWriter::new(SVGMode::TextRenderingTests(opts.testcase), transform);
+        writer.glyphs_to_svg(&mut cff2_post, &mut font, &infos, direction)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
         let loca = ReadScope::new(&loca_data).read_dep::<LocaTable<'_>>((
@@ -84,7 +107,8 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             .as_ref()
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
-        let mut glyf_post = GlyfPost { glyf, post };
+
+        let mut glyf_post = NamedOutliner { table: glyf, post };
         let writer = SVGWriter::new(SVGMode::TextRenderingTests(opts.testcase), transform);
         writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction)?
     } else {
@@ -123,38 +147,57 @@ fn load_font_maybe_instance(opts: &SvgOpts) -> Result<(Vec<u8>, Option<OwnedTupl
     let font_file = scope.read::<FontData<'_>>()?;
     let provider = font_file.table_provider(0)?;
 
-    if provider.has_table(tag::FVAR) && provider.has_table(tag::GVAR) {
-        // Construct the user tuple
-        // wght:28;wdth:100;opsz:72
-        let test_variations = dbg!(opts.variation.as_deref().unwrap_or(""))
-            .split(';')
-            .map(|pair| {
-                let (axis, value) = pair.split_once(':').expect("variation does no contain ':'");
-                let axis = tag::from_string(axis).expect("invalid axis tag");
-                let value = f64::from_str(value)
-                    .map(Fixed::from)
-                    .expect("invalid axis value");
-                (axis, value)
-            })
-            .collect::<HashMap<_, _>>();
-
-        let table = provider.read_table_data(tag::FVAR)?;
-        let fvar = ReadScope::new(&table).read::<FvarTable<'_>>()?;
-        let user_tuple = fvar
-            .axes()
-            .map(|axis| {
-                test_variations
-                    .get(&axis.axis_tag)
-                    .copied()
-                    .unwrap_or(axis.default_value)
-            })
-            .collect::<Vec<_>>();
-
-        allsorts::variations::instance(&provider, &user_tuple)
-            .map(|(font, tuple)| (font, Some(tuple)))
-            .map_err(BoxError::from)
+    if provider.has_table(tag::FVAR)
+        && (provider.has_table(tag::GVAR) || provider.has_table(tag::CFF2))
+    {
+        instance_font(opts, &provider)
     } else {
         drop(provider);
         Ok((buffer, None))
     }
+}
+
+fn instance_font(
+    opts: &SvgOpts,
+    provider: &DynamicFontTableProvider,
+) -> Result<(Vec<u8>, Option<OwnedTuple>), BoxError> {
+    let user_tuple = parse_variation_settings(opts, provider)?;
+
+    allsorts::variations::instance(provider, &user_tuple)
+        .map(|(font, tuple)| (font, Some(tuple)))
+        .map_err(BoxError::from)
+}
+
+// Parse string like: wght:28;wdth:100;opsz:72
+fn parse_variation_settings(
+    opts: &SvgOpts,
+    provider: &DynamicFontTableProvider,
+) -> Result<Vec<Fixed>, BoxError> {
+    let test_variations = opts
+        .variation
+        .as_deref()
+        .unwrap_or("")
+        .split(';')
+        .map(|pair| {
+            let (axis, value) = pair.split_once(':').expect("variation does no contain ':'"); // FIXME: expect
+            let axis = tag::from_string(axis).expect("invalid axis tag");
+            let value = f64::from_str(value)
+                .map(Fixed::from)
+                .expect("invalid axis value");
+            (axis, value)
+        })
+        .collect::<HashMap<_, _>>();
+
+    let table = provider.read_table_data(tag::FVAR)?;
+    let fvar = ReadScope::new(&table).read::<FvarTable<'_>>()?;
+    let user_tuple = fvar
+        .axes()
+        .map(|axis| {
+            test_variations
+                .get(&axis.axis_tag)
+                .copied()
+                .unwrap_or(axis.default_value)
+        })
+        .collect::<Vec<_>>();
+    Ok(user_tuple)
 }
