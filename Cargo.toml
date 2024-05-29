@@ -17,6 +17,7 @@ xmlwriter = "0.1.0"
 
 [dependencies.allsorts]
 version = "0.15.0"
+features = ["specimen"]
 
 [dev-dependencies]
 assert_cmd = "1"
