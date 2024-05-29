@@ -35,13 +35,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     let provider = font_file.table_provider(0)?;
 
     // Map text to glyphs and then apply font shaping
-    let mut font = match Font::new(provider)? {
-        Some(font) => font,
-        None => {
-            eprintln!("unable to find suitable cmap subtable");
-            return Ok(1);
-        }
-    };
+    let mut font = Font::new(provider)?;
     let glyphs = font.map_glyphs(&opts.render, script, MatchingPresentation::NotRequired);
     let infos = font
         .shape(

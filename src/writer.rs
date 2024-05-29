@@ -488,19 +488,19 @@ impl<'info> Symbol<'info> {
                         GlyphOrigin::Direct => String::from("direct"),
                     },
                 );
-                if self.info.glyph.small_caps {
+                if self.info.glyph.small_caps() {
                     data.insert("data-small-caps", bool_true.clone());
                 }
-                if self.info.glyph.multi_subst_dup {
+                if self.info.glyph.multi_subst_dup() {
                     data.insert("data-multi-subst-dup", bool_true.clone());
                 }
-                if self.info.glyph.is_vert_alt {
+                if self.info.glyph.is_vert_alt() {
                     data.insert("data-is-vert-alt", bool_true.clone());
                 }
-                if self.info.glyph.fake_bold {
+                if self.info.glyph.fake_bold() {
                     data.insert("data-fake-bold", bool_true.clone());
                 }
-                if self.info.glyph.fake_italic {
+                if self.info.glyph.fake_italic() {
                     data.insert("data-fake-italic", bool_true.clone());
                 }
                 data

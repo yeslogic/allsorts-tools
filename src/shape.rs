@@ -29,13 +29,7 @@ pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
         None => None,
     };
 
-    let mut font = match Font::new(Box::new(provider))? {
-        Some(font) => font,
-        None => {
-            eprintln!("unable to find suitable cmap subtable");
-            return Ok(1);
-        }
-    };
+    let mut font = Font::new(Box::new(provider))?;
     let glyphs = font.map_glyphs(&opts.text, script, MatchingPresentation::NotRequired);
     let infos = font
         .shape(

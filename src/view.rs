@@ -3,7 +3,7 @@ use allsorts::cff::CFF;
 use allsorts::error::ParseError;
 use allsorts::font::{Font, GlyphTableFlags, MatchingPresentation};
 use allsorts::font_data::FontData;
-use allsorts::gsub::{FeatureInfo, FeatureMask, Features, GlyphOrigin, RawGlyph};
+use allsorts::gsub::{FeatureInfo, FeatureMask, Features, GlyphOrigin, RawGlyph, RawGlyphFlags};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
@@ -58,13 +58,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
         None => None,
     };
 
-    let mut font = match Font::new(provider)? {
-        Some(font) => font,
-        None => {
-            eprintln!("unable to find suitable cmap subtable");
-            return Ok(1);
-        }
-    };
+    let mut font = Font::new(provider)?;
 
     let glyphs = if let Some(ref text) = opts.text {
         font.map_glyphs(&text, script, MatchingPresentation::NotRequired)
@@ -163,11 +157,7 @@ fn make_raw_glyph(glyph_index: u16) -> RawGlyph<()> {
         glyph_index,
         liga_component_pos: 0,
         glyph_origin: GlyphOrigin::Char('x'),
-        small_caps: false,
-        multi_subst_dup: false,
-        is_vert_alt: false,
-        fake_bold: false,
-        fake_italic: false,
+        flags: RawGlyphFlags::empty(),
         variation: None,
         extra_data: (),
     }
