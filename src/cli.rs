@@ -36,6 +36,9 @@ pub enum Command {
     #[options(help = "apply shaping to glyphs from a font")]
     Shape(ShapeOpts),
 
+    #[options(help = "generate a specimen page for a font")]
+    Specimen(SpecimenOpts),
+
     #[options(help = "subset a font")]
     Subset(SubsetOpts),
 
@@ -232,6 +235,29 @@ pub struct ShapeOpts {
 
     #[options(help = "vertical layout, default horizontal", no_short)]
     pub vertical: bool,
+}
+
+#[derive(Debug, Options)]
+pub struct SpecimenOpts {
+    #[options(help = "print help message")]
+    pub help: bool,
+
+    #[options(
+        help = "index of the font to read (for TTC, WOFF2)",
+        meta = "INDEX",
+        default = "0"
+    )]
+    pub index: u32,
+
+    #[options(
+        no_short,
+        help = "sample text to use in the font specimen",
+        meta = "TEXT"
+    )]
+    pub sample_text: Option<String>,
+
+    #[options(free, required, help = "path to font file")]
+    pub font: String,
 }
 
 #[derive(Debug, Options)]
