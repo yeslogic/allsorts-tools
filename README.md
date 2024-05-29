@@ -40,6 +40,7 @@ Available tools:
 * [`instance`](#instance) — create a static instance of a font from a variable font
 * [`layout-features`](#layout-features) — print a list of a font's GSUB and GPOS features
 * [`shape`](#shape) — apply shaping to glyphs from a font
+* [`specimen`](#specimen) — generate a HTML font speciment for a font
 * [`subset`](#subset) — subset a font
 * [`validate`](#validate) — parse the supplied font, reporting any failures
 * [`variations`](#variations) — list the variation axes of a variable font
@@ -236,6 +237,20 @@ script. It prints out the glyphs before and after shaping.
 
     $ shape -f fonts/devanagari/AnnapurnaSIL-Regular.ttf -s deva -l HIN 'शब्दों और वाक्यों की तरह'
     # output omitted
+
+### `specimen`
+
+The `specimen` tool generates a HTML font specimen sheet containing sample text
+set in the font as well as information about the font and its supported features.
+
+#### Options
+
+* `-i`, `--index INDEX` index of the font to subset (for TTC, WOFF2) (default: 0)
+* `--sample-text TEXT` sample text to use in the font specimen
+
+#### Example
+
+    $ allsorts specimen ../allsorts/tests/fonts/bengali/Lohit-Bengali.ttf
 
 ### `subset`
 

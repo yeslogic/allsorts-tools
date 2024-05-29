@@ -8,6 +8,7 @@ pub mod instance;
 pub mod layout_features;
 mod script;
 pub mod shape;
+pub mod specimen;
 pub mod subset;
 pub mod svg;
 pub mod validate;
