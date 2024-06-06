@@ -40,6 +40,7 @@ Available tools:
 * [`instance`](#instance) — create a static instance of a font from a variable font
 * [`layout-features`](#layout-features) — print a list of a font's GSUB and GPOS features
 * [`shape`](#shape) — apply shaping to glyphs from a font
+* [`specimen`](#specimen) — generate a HTML font speciment for a font
 * [`subset`](#subset) — subset a font
 * [`validate`](#validate) — parse the supplied font, reporting any failures
 * [`variations`](#variations) — list the variation axes of a variable font
@@ -170,8 +171,10 @@ This tool is handy combined with `find`, to locate fonts that have the desired t
 
 #### Options
 
-* `-p` makes the tool print the path to the font if it contains the
-  table.
+* `-t`, `--table TABLE` table to check for
+* `-i`, `--index INDEX` index of the font to check (for TTC, WOFF2) (default: 0)
+* `-p`, `--print-file` print the path to the font if it contains the table.
+* `-v`, `--invert-match` select fonts that don't have the given table
 
 #### Example
 
@@ -188,9 +191,9 @@ variable font to produce a static, non-variable font with those settings.
 
 #### Options
 
-* `-t, --tuple` is a comma separated list of values one for each variation axis
+* `-t`, `--tuple` is a comma separated list of values one for each variation axis
   of the font. The `variations` tool will list the axes, their order, and limits.
-* `-o, --output` is the path to the output font.
+* `-o`, `--output` is the path to the output font.
 
 #### Example
 
@@ -237,6 +240,20 @@ script. It prints out the glyphs before and after shaping.
     $ shape -f fonts/devanagari/AnnapurnaSIL-Regular.ttf -s deva -l HIN 'शब्दों और वाक्यों की तरह'
     # output omitted
 
+### `specimen`
+
+The `specimen` tool generates a HTML font specimen sheet containing sample text
+set in the font as well as information about the font and its supported features.
+
+#### Options
+
+* `-i`, `--index INDEX` index of the font to subset (for TTC, WOFF2) (default: 0)
+* `--sample-text TEXT` sample text to use in the font specimen
+
+#### Example
+
+    $ allsorts specimen ../allsorts/tests/fonts/bengali/Lohit-Bengali.ttf
+
 ### `subset`
 
 The `subset` tool takes a source font and some text and writes a new version of
@@ -244,9 +261,9 @@ the source font only containing the glyphs required for the supplied text.
 
 #### Options
 
-`-t`, `--text TEXT` subset the font to include glyphs from TEXT
-`-a`, `--all` include all glyphs in the subset font
-`-i`, `--index INDEX` index of the font to subset (for TTC, WOFF2) (default: 0)
+* `-t`, `--text TEXT` subset the font to include glyphs from TEXT
+* `-a`, `--all` include all glyphs in the subset font
+* `-i`, `--index INDEX` index of the font to subset (for TTC, WOFF2) (default: 0)
 
 #### Example
 
