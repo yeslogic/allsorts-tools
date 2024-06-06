@@ -46,7 +46,9 @@ dependencies = [
 
 [[package]]
 name = "allsorts"
-version = "0.14.1"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7b566d29776fc848a8279a72339499db95ee5592926bac114d35aa9a92efe9c"
 dependencies = [
  "bitflags",
  "bitreader",
