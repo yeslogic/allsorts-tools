@@ -14,13 +14,7 @@ pub fn main(opts: CmapOpts) -> Result<i32, BoxError> {
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData>()?;
     let table_provider = font_file.table_provider(opts.index)?;
-    let mut font = match Font::new(Box::new(table_provider))? {
-        Some(font) => font,
-        None => {
-            eprintln!("unable to find suitable cmap subtable");
-            return Ok(1);
-        }
-    };
+    let mut font = Font::new(Box::new(table_provider))?;
     dump_cmap(&mut font)?;
 
     Ok(0)

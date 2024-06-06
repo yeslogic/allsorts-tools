@@ -3,20 +3,21 @@ use allsorts::cff::CFF;
 use allsorts::error::ParseError;
 use allsorts::font::{Font, GlyphTableFlags, MatchingPresentation};
 use allsorts::font_data::FontData;
-use allsorts::gsub::{FeatureInfo, FeatureMask, Features, GlyphOrigin, RawGlyph};
+use allsorts::gsub::{FeatureInfo, FeatureMask, Features, GlyphOrigin, RawGlyph, RawGlyphFlags};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
 use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::loca::LocaTable;
+use allsorts::tables::variable_fonts::OwnedTuple;
 use allsorts::tables::{FontTableProvider, SfntVersion};
 use allsorts::tag;
 use allsorts::tinyvec::tiny_vec;
 
 use crate::cli::ViewOpts;
-use crate::script;
-use crate::writer::{GlyfPost, SVGMode, SVGWriter};
+use crate::writer::{NamedOutliner, SVGMode, SVGWriter};
 use crate::BoxError;
+use crate::{normalise_tuple, parse_tuple, script};
 
 const FONT_SIZE: f32 = 1000.0;
 
@@ -44,13 +45,20 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData<'_>>()?;
     let provider = font_file.table_provider(0)?;
-    let mut font = match Font::new(provider)? {
-        Some(font) => font,
-        None => {
-            eprintln!("unable to find suitable cmap subtable");
-            return Ok(1);
-        }
+
+    let user_tuple = opts.tuple.as_deref().map(parse_tuple).transpose()?;
+    let tuple = match user_tuple {
+        Some(user_tuple) => match normalise_tuple(&provider, &user_tuple) {
+            Ok(tuple) => Some(tuple),
+            Err(err) => {
+                eprintln!("unable to normalise variation tuple: {err}");
+                return Ok(1);
+            }
+        },
+        None => None,
     };
+
+    let mut font = Font::new(provider)?;
 
     let glyphs = if let Some(ref text) = opts.text {
         font.map_glyphs(&text, script, MatchingPresentation::NotRequired)
@@ -64,7 +72,14 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     };
 
     let infos = font
-        .shape(glyphs, script, lang, &features, true)
+        .shape(
+            glyphs,
+            script,
+            lang,
+            &features,
+            tuple.as_ref().map(OwnedTuple::as_tuple),
+            true,
+        )
         .map_err(|(err, _infos)| err)?;
     let direction = script::direction(script);
 
@@ -96,7 +111,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
             .as_ref()
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
-        let mut glyf_post = GlyfPost { glyf, post };
+        let mut glyf_post = NamedOutliner { table: glyf, post };
         let writer = SVGWriter::new(mode, transform);
         writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction)?
     } else {
@@ -142,11 +157,7 @@ fn make_raw_glyph(glyph_index: u16) -> RawGlyph<()> {
         glyph_index,
         liga_component_pos: 0,
         glyph_origin: GlyphOrigin::Char('x'),
-        small_caps: false,
-        multi_subst_dup: false,
-        is_vert_alt: false,
-        fake_bold: false,
-        fake_italic: false,
+        flags: RawGlyphFlags::empty(),
         variation: None,
         extra_data: (),
     }

@@ -5,16 +5,14 @@ use std::str::FromStr;
 
 use allsorts::cff::CFF;
 use allsorts::context::Glyph;
-use allsorts::error::ParseError;
 use allsorts::glyph_position::{GlyphLayout, GlyphPosition, TextDirection};
 use allsorts::gpos::{Info, Placement};
 use allsorts::gsub::GlyphOrigin;
 use allsorts::outline::{OutlineBuilder, OutlineSink};
 use allsorts::pathfinder_geometry::line_segment::LineSegment2F;
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
-use allsorts::pathfinder_geometry::vector::{vec2f, Vector2F};
+use allsorts::pathfinder_geometry::vector::{vec2f, Vector2F, Vector2I};
 use allsorts::post::PostTable;
-use allsorts::tables::glyf::GlyfTable;
 use allsorts::tables::FontTableProvider;
 use allsorts::Font;
 use xmlwriter::XmlWriter;
@@ -32,8 +30,8 @@ pub trait GlyphName {
     fn gid_to_glyph_name(&self, gid: u16) -> Option<String>;
 }
 
-pub struct GlyfPost<'a> {
-    pub glyf: GlyfTable<'a>,
+pub struct NamedOutliner<'a, T> {
+    pub table: T,
     pub post: Option<PostTable<'a>>,
 }
 
@@ -150,31 +148,35 @@ impl<'a> GlyphName for CFF<'a> {
             return None;
         }
         let sid = font.charset.id_for_glyph(glyph_id)?;
-        self.read_string(sid).ok()
+        self.read_string(sid).map(ToString::to_string).ok()
     }
 }
 
-impl<'a> GlyphName for GlyfPost<'a> {
+impl<'a, T> GlyphName for NamedOutliner<'a, T> {
     fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
         self.post
             .as_ref()
             .and_then(|post| post.glyph_name(glyph_id).ok().flatten())
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
     }
 }
 
-impl<'a> OutlineBuilder for GlyfPost<'a> {
-    type Error = ParseError;
+impl<'a, T> OutlineBuilder for NamedOutliner<'a, T>
+where
+    T: OutlineBuilder,
+{
+    type Error = T::Error;
 
     fn visit<V: OutlineSink>(
         &mut self,
         glyph_index: u16,
         visitor: &mut V,
     ) -> Result<(), Self::Error> {
-        self.glyf.visit(glyph_index, visitor)
+        self.table.visit(glyph_index, visitor)
     }
 }
 
+#[derive(Clone)]
 pub enum SVGMode {
     /// SVGs are being generated to comply with the expected output of the
     /// [Unicode text rendering tests](https://github.com/unicode-org/text-rendering-tests).
@@ -199,6 +201,9 @@ pub struct SVGWriter {
 struct Symbols<'info> {
     transform: Matrix2x2F,
     symbols: Vec<Symbol<'info>>,
+    mode: SVGMode,
+    initial_move_to: Vector2I,
+    last_line_to: Option<Vector2I>,
 }
 
 impl SVGWriter {
@@ -249,6 +254,9 @@ impl SVGWriter {
         let mut symbols = Symbols {
             transform: self.transform,
             symbols: Vec::new(),
+            mode: self.mode.clone(),
+            initial_move_to: Vector2I::zero(),
+            last_line_to: None,
         };
         let mut symbol_map = HashMap::new();
         for (info, pos) in iter {
@@ -480,19 +488,19 @@ impl<'info> Symbol<'info> {
                         GlyphOrigin::Direct => String::from("direct"),
                     },
                 );
-                if self.info.glyph.small_caps {
+                if self.info.glyph.small_caps() {
                     data.insert("data-small-caps", bool_true.clone());
                 }
-                if self.info.glyph.multi_subst_dup {
+                if self.info.glyph.multi_subst_dup() {
                     data.insert("data-multi-subst-dup", bool_true.clone());
                 }
-                if self.info.glyph.is_vert_alt {
+                if self.info.glyph.is_vert_alt() {
                     data.insert("data-is-vert-alt", bool_true.clone());
                 }
-                if self.info.glyph.fake_bold {
+                if self.info.glyph.fake_bold() {
                     data.insert("data-fake-bold", bool_true.clone());
                 }
-                if self.info.glyph.fake_italic {
+                if self.info.glyph.fake_italic() {
                     data.insert("data-fake-italic", bool_true.clone());
                 }
                 data
@@ -505,47 +513,109 @@ impl<'info> Symbol<'info> {
     }
 }
 
+// When rendering in TextRenderingTests mode the paths are "normalised" by
+// truncating them. The matches what the other test harnesses do and makes the
+// output SVGs match the expectations, which have had the same treatment.
+//
+// Additionally, the expected SVGs in the test suite require matching a
+// FreeType optimisation where a line-to back to the start of the path
+// is dropped, as close-path will handle that.
 impl<'info> OutlineSink for Symbols<'info> {
     fn move_to(&mut self, point: Vector2F) {
         let point = self.transform * point;
-        self.current_path()
-            .push_str(&format!(" M{},{}", point.x(), point.y()));
+        let path = match self.mode {
+            SVGMode::TextRenderingTests(_) => {
+                let point = Vector2I::new(point.x() as i32, point.y() as i32);
+                self.initial_move_to = point;
+                self.last_line_to = None;
+                format!(" M{},{}", point.x(), point.y())
+            }
+            SVGMode::View { .. } => format!(" M{},{}", point.x(), point.y()),
+        };
+        self.current_path().push_str(&path);
     }
 
     fn line_to(&mut self, point: Vector2F) {
         let point = self.transform * point;
-        self.current_path()
-            .push_str(&format!(" L{},{}", point.x(), point.y()));
+        let path = match self.mode {
+            SVGMode::TextRenderingTests(_) => {
+                let point = Vector2I::new(point.x() as i32, point.y() as i32);
+                self.last_line_to = Some(point);
+                format!(" L{},{}", point.x(), point.y())
+            }
+            SVGMode::View { .. } => format!(" L{},{}", point.x(), point.y()),
+        };
+        self.current_path().push_str(&path);
     }
 
     fn quadratic_curve_to(&mut self, control: Vector2F, point: Vector2F) {
         let control = self.transform * control;
         let point = self.transform * point;
-        self.current_path().push_str(&format!(
-            " Q{},{} {},{}",
-            control.x(),
-            control.y(),
-            point.x(),
-            point.y()
-        ));
+        let path = match self.mode {
+            SVGMode::TextRenderingTests(_) => {
+                self.last_line_to = None;
+                format!(
+                    " Q{},{} {},{}",
+                    control.x() as i32,
+                    control.y() as i32,
+                    point.x() as i32,
+                    point.y() as i32
+                )
+            }
+            SVGMode::View { .. } => format!(
+                " Q{},{} {},{}",
+                control.x(),
+                control.y(),
+                point.x(),
+                point.y()
+            ),
+        };
+        self.current_path().push_str(&path);
     }
 
     fn cubic_curve_to(&mut self, ctrl: LineSegment2F, to: Vector2F) {
         let ctrl_from = self.transform * ctrl.from();
         let ctrl_to = self.transform * ctrl.to();
         let to = self.transform * to;
-        self.current_path().push_str(&format!(
-            " C{},{} {},{} {},{}",
-            ctrl_from.x(),
-            ctrl_from.y(),
-            ctrl_to.x(),
-            ctrl_to.y(),
-            to.x(),
-            to.y()
-        ));
+        let path = match self.mode {
+            SVGMode::TextRenderingTests(_) => {
+                self.last_line_to = None;
+                format!(
+                    " C{},{} {},{} {},{}",
+                    ctrl_from.x() as i32,
+                    ctrl_from.y() as i32,
+                    ctrl_to.x() as i32,
+                    ctrl_to.y() as i32,
+                    to.x() as i32,
+                    to.y() as i32
+                )
+            }
+            SVGMode::View { .. } => format!(
+                " C{},{} {},{} {},{}",
+                ctrl_from.x(),
+                ctrl_from.y(),
+                ctrl_to.x(),
+                ctrl_to.y(),
+                to.x(),
+                to.y()
+            ),
+        };
+        self.current_path().push_str(&path);
     }
 
     fn close(&mut self) {
+        if matches!(self.mode, SVGMode::TextRenderingTests(_)) {
+            match self.last_line_to {
+                Some(last_line_to) if last_line_to == self.initial_move_to => {
+                    // Suppress last line to
+                    if let Some(m_pos) = self.current_path().rfind(" L") {
+                        self.current_path().truncate(m_pos);
+                    }
+                }
+                _ => {}
+            }
+        }
+
         self.current_path().push_str(" Z"); // close path
     }
 }

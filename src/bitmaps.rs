@@ -20,7 +20,7 @@ pub fn main(opts: BitmapOpts) -> Result<i32, BoxError> {
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData>()?;
     let table_provider = font_file.table_provider(opts.index)?;
-    let mut font = Font::new(table_provider)?.ok_or("unable to find suitable cmap sub-table")?;
+    let mut font = Font::new(table_provider)?;
 
     let output_path = Path::new(&opts.output);
     if !output_path.exists() {

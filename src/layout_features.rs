@@ -12,13 +12,7 @@ pub fn main(opts: LayoutFeaturesOpts) -> Result<i32, BoxError> {
     let scope = ReadScope::new(&buffer);
     let font_file = scope.read::<FontData>()?;
     let provider = font_file.table_provider(opts.index)?;
-    let mut font = match Font::new(provider)? {
-        Some(font) => font,
-        None => {
-            eprintln!("unable to find suitable cmap subtable");
-            return Ok(1);
-        }
-    };
+    let mut font = Font::new(provider)?;
 
     if let Some(gsub_cache) = font.gsub_cache()? {
         println!("Table: GSUB");

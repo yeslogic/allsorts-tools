@@ -6,7 +6,7 @@ use std::str;
 use allsorts::binary::read::ReadScope;
 use allsorts::font::read_cmap_subtable;
 use allsorts::font_data::FontData;
-use allsorts::gsub::{GlyphOrigin, RawGlyph};
+use allsorts::gsub::{GlyphOrigin, RawGlyph, RawGlyphFlags};
 use allsorts::tables::cmap::Cmap;
 use allsorts::tables::{FontTableProvider, MaxpTable};
 use allsorts::tinyvec::tiny_vec;
@@ -61,13 +61,9 @@ fn subset_text<F: FontTableProvider>(
         glyph_index: 0,
         liga_component_pos: 0,
         glyph_origin: GlyphOrigin::Direct,
-        small_caps: false,
-        multi_subst_dup: false,
-        is_vert_alt: false,
-        fake_bold: false,
-        fake_italic: false,
-        extra_data: (),
+        flags: RawGlyphFlags::empty(),
         variation: None,
+        extra_data: (),
     };
     glyphs.insert(0, Some(notdef));
 

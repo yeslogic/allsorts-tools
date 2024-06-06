@@ -3,10 +3,10 @@ use std::convert::{self, TryFrom};
 use std::io::{self, IsTerminal, Write};
 use std::str;
 
-use encoding_rs::{Encoding, MACINTOSH, UTF_16BE};
+use encoding_rs::{MACINTOSH, UTF_16BE};
 
 use allsorts::binary::read::ReadScope;
-use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operator, CFF};
+use allsorts::cff::{self, CFFVariant, Charset, FontDict, Operand, Operator, CFF};
 use allsorts::error::ParseError;
 use allsorts::font::read_cmap_subtable;
 use allsorts::font_data::FontData;
@@ -23,7 +23,7 @@ use allsorts::woff::WoffFont;
 use allsorts::woff2::{Woff2Font, Woff2GlyfTable, Woff2LocaTable};
 
 use crate::cli::DumpOpts;
-use crate::{BoxError, ErrorMessage};
+use crate::{decode, BoxError, ErrorMessage};
 
 type Tag = u32;
 
@@ -258,8 +258,8 @@ fn dump_woff2<'a>(
         ))?;
         let glyf = table.scope().read_dep::<Woff2GlyfTable>((entry, &loca))?;
 
-        println!("Read glyf table with {} glyphs:", glyf.records.len());
-        for glyph in glyf.records {
+        println!("Read glyf table with {} glyphs:", glyf.num_glyphs());
+        for glyph in glyf.records() {
             println!("- {:?}", glyph);
         }
     }
@@ -303,6 +303,17 @@ fn dump_name_table(name_table: &NameTable) -> Result<(), ParseError> {
         }
         println!("{:?}", name);
         println!();
+    }
+
+    if let Some(langtag_records) = &name_table.opt_langtag_records {
+        for langtag in langtag_records.iter() {
+            let name_data = name_table
+                .string_storage
+                .offset_length(langtag.offset.into(), langtag.length.into())?
+                .data();
+            let name = decode(UTF_16BE, name_data);
+            println!("langtag {}", name);
+        }
     }
 
     Ok(())
@@ -366,18 +377,12 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
         println!(" - name: {}", name);
     }
 
-    if cff.name_index.count != 1 {
+    if cff.name_index.len() != 1 {
         return Err(ParseError::BadIndex);
     }
     let font = cff.fonts.get(0).ok_or(ParseError::MissingValue)?;
-    let char_strings_offset = font
-        .top_dict
-        .get_i32(Operator::CharStrings)
-        .ok_or(ParseError::MissingValue)??;
-    let char_strings_index = scope
-        .offset(usize::try_from(char_strings_offset)?)
-        .read::<cff::Index<'_>>()?;
-    println!(" - num glyphs: {}", char_strings_index.count);
+    let char_strings_index = &font.char_strings_index;
+    println!(" - num glyphs: {}", char_strings_index.len());
     println!(
         " - charset: {}",
         match font.charset {
@@ -396,9 +401,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     );
     println!();
     println!(" - Top DICT");
-    for (op, operands) in font.top_dict.iter() {
-        println!("  - {:?}: {:?}", op, operands);
-    }
+    dump_cff_dict(&cff, &font.top_dict, 2);
     match &font.data {
         CFFVariant::Type1(ref type1) => {
             println!();
@@ -412,9 +415,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
             );
             println!();
             println!(" - Private DICT");
-            for (op, operands) in type1.private_dict.iter() {
-                println!("  - {:?}: {:?}", op, operands);
-            }
+            dump_cff_dict(&cff, &type1.private_dict, 2);
             let (subrs_count, subrs_size) = match type1.local_subr_index {
                 Some(ref index) => (index.len(), index.data_len()),
                 None => (0, 0),
@@ -425,17 +426,13 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
             for (i, object) in cid.font_dict_index.iter().enumerate() {
                 println!();
                 println!(" - Font DICT {}", i);
-                let font_dict = ReadScope::new(object).read::<FontDict>()?;
-                for (op, operands) in font_dict.iter() {
-                    println!("  - {:?}: {:?}", op, operands);
-                }
-
+                let font_dict = ReadScope::new(object).read_dep::<FontDict>(cff::MAX_OPERANDS)?;
+                dump_cff_dict(&cff, &font_dict, 2);
                 println!();
                 println!("  - Private DICT");
-                let (private_dict, _private_dict_offset) = font_dict.read_private_dict(&scope)?;
-                for (op, operands) in private_dict.iter() {
-                    println!("   - {:?}: {:?}", op, operands);
-                }
+                let (private_dict, _private_dict_offset) =
+                    font_dict.read_private_dict::<cff::PrivateDict>(&scope, cff::MAX_OPERANDS)?;
+                dump_cff_dict(&cff, &private_dict, 4);
             }
             let (subrs_count, subrs_size) =
                 cid.local_subr_indices
@@ -484,7 +481,7 @@ fn dump_glyph(provider: &impl FontTableProvider, glyph_id: u16) -> Result<(), Pa
     let glyf = scope.read_dep::<GlyfTable>(&loca)?;
 
     let mut glyph = glyf
-        .records
+        .records()
         .get(usize::from(glyph_id))
         .ok_or(ParseError::BadValue)?
         .clone();
@@ -492,6 +489,45 @@ fn dump_glyph(provider: &impl FontTableProvider, glyph_id: u16) -> Result<(), Pa
     println!("{:#?}", glyph);
 
     Ok(())
+}
+
+fn dump_cff_dict<T: cff::DictDefault>(cff: &CFF, dict: &cff::Dict<T>, indent: usize) {
+    for x in dict.iter().map(|(op, ops)| (op, ops.as_slice())) {
+        match x {
+            // For operators with a string id operand, resolve the string
+            (op @ Operator::Version, &[Operand::Integer(sid)])
+            | (op @ Operator::Notice, &[Operand::Integer(sid)])
+            | (op @ Operator::Copyright, &[Operand::Integer(sid)])
+            | (op @ Operator::FullName, &[Operand::Integer(sid)])
+            | (op @ Operator::FamilyName, &[Operand::Integer(sid)])
+            | (op @ Operator::Weight, &[Operand::Integer(sid)])
+            | (op @ Operator::BaseFontName, &[Operand::Integer(sid)]) => {
+                let string = u16::try_from(sid)
+                    .ok()
+                    .and_then(|sid| cff.read_string(sid).ok())
+                    .unwrap_or("<unable to read>");
+                println!("{:indent$}- {:?}: {}", " ", op, string);
+            }
+            (
+                op @ Operator::ROS,
+                &[Operand::Integer(registry), Operand::Integer(ordering), Operand::Integer(supplement)],
+            ) => {
+                let registry = u16::try_from(registry)
+                    .ok()
+                    .and_then(|sid| cff.read_string(sid).ok())
+                    .unwrap_or("<unable to read>");
+                let ordering = u16::try_from(ordering)
+                    .ok()
+                    .and_then(|sid| cff.read_string(sid).ok())
+                    .unwrap_or("<unable to read>");
+                println!(
+                    "{:indent$}- {:?}: {}-{}-{}",
+                    " ", op, registry, ordering, supplement
+                );
+            }
+            (op, operands) => println!("{:indent$}- {:?}: {:?}", " ", op, operands),
+        }
+    }
 }
 
 fn dump_raw_table(scope: Option<ReadScope>) -> Result<(), BoxError> {
@@ -504,45 +540,33 @@ fn dump_raw_table(scope: Option<ReadScope>) -> Result<(), BoxError> {
     }
 }
 
-fn decode(encoding: &'static Encoding, data: &[u8]) -> String {
-    let mut decoder = encoding.new_decoder();
-    if let Some(size) = decoder.max_utf8_buffer_length(data.len()) {
-        let mut s = String::with_capacity(size);
-        let (_res, _read, _repl) = decoder.decode_to_string(data, &mut s, true);
-        s
-    } else {
-        String::new() // can only happen if buffer is enormous
-    }
-}
-
 fn get_name_meaning(name_id: u16) -> Option<&'static str> {
     match name_id {
-        0 => Some("Copyright"),
-        1 => Some("Font Family"),
-        2 => Some("Font Subfamily"),
-        3 => Some("Unique Identifier"),
-        4 => Some("Full Font Name"),
-        5 => Some("Version"),
-        6 => Some("PostScript Name"),
-        7 => Some("Trademark"),
-        8 => Some("Manufacturer"),
-        9 => Some("Designer"),
-        10 => Some("Description"),
-        11 => Some("URL Vendor"),
-        12 => Some("URL Designer"),
-        13 => Some("License Description"),
-        14 => Some("License Info URL"),
-        15 => None, // Reserved
-        16 => Some("Typographic Family"),
-        17 => Some("Typographic Subfamily"),
-        18 => Some("Compatible Full"),
-        19 => Some("Sample Text"),
-        20 => Some("PostScript CID findfont"),
-        21 => Some("WWS Family Name"),
-        22 => Some("WWS Subfamily Name"),
-        23 => Some("Light Background Palette"),
-        24 => Some("Dark Background Palette"),
-        25 => Some("Variations PostScript Name Prefix"),
+        NameTable::COPYRIGHT_NOTICE => Some("Copyright"),
+        NameTable::FONT_FAMILY_NAME => Some("Font Family"),
+        NameTable::FONT_SUBFAMILY_NAME => Some("Font Subfamily"),
+        NameTable::UNIQUE_FONT_IDENTIFIER => Some("Unique Identifier"),
+        NameTable::FULL_FONT_NAME => Some("Full Font Name"),
+        NameTable::VERSION_STRING => Some("Version"),
+        NameTable::POSTSCRIPT_NAME => Some("PostScript Name"),
+        NameTable::TRADEMARK => Some("Trademark"),
+        NameTable::MANUFACTURER_NAME => Some("Manufacturer"),
+        NameTable::DESIGNER => Some("Designer"),
+        NameTable::DESCRIPTION => Some("Description"),
+        NameTable::URL_VENDOR => Some("URL Vendor"),
+        NameTable::URL_DESIGNER => Some("URL Designer"),
+        NameTable::LICENSE_DESCRIPTION => Some("License Description"),
+        NameTable::LICENSE_INFO_URL => Some("License Info URL"),
+        NameTable::TYPOGRAPHIC_FAMILY_NAME => Some("Typographic Family"),
+        NameTable::TYPOGRAPHIC_SUBFAMILY_NAME => Some("Typographic Subfamily"),
+        NameTable::COMPATIBLE_FULL => Some("Compatible Full"),
+        NameTable::SAMPLE_TEXT => Some("Sample Text"),
+        NameTable::POSTSCRIPT_CID_FINDFONT_NAME => Some("PostScript CID findfont"),
+        NameTable::WWS_FAMILY_NAME => Some("WWS Family Name"),
+        NameTable::WWS_SUBFAMILY_NAME => Some("WWS Subfamily Name"),
+        NameTable::LIGHT_BACKGROUND_PALETTE => Some("Light Background Palette"),
+        NameTable::DARK_BACKGROUND_PALETTE => Some("Dark Background Palette"),
+        NameTable::VARIATIONS_POSTSCRIPT_NAME_PREFIX => Some("Variations PostScript Name Prefix"),
         _ => None,
     }
 }

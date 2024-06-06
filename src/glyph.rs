@@ -1,5 +1,5 @@
 use allsorts::error::ParseError;
-use allsorts::gsub::{GlyphOrigin, RawGlyph};
+use allsorts::gsub::{GlyphOrigin, RawGlyph, RawGlyphFlags};
 use allsorts::tables::cmap::CmapSubtable;
 use allsorts::tinyvec::tiny_vec;
 use allsorts::unicode::VariationSelector;
@@ -27,12 +27,8 @@ pub(crate) fn make(
         glyph_index,
         liga_component_pos: 0,
         glyph_origin: GlyphOrigin::Char(ch),
-        small_caps: false,
-        multi_subst_dup: false,
-        is_vert_alt: false,
-        fake_bold: false,
-        fake_italic: false,
-        extra_data: (),
+        flags: RawGlyphFlags::empty(),
         variation,
+        extra_data: (),
     }
 }
