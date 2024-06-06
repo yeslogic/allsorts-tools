@@ -171,8 +171,10 @@ This tool is handy combined with `find`, to locate fonts that have the desired t
 
 #### Options
 
-* `-p` makes the tool print the path to the font if it contains the
-  table.
+* `-t`, `--table TABLE` table to check for
+* `-i`, `--index INDEX` index of the font to check (for TTC, WOFF2) (default: 0)
+* `-p`, `--print-file` print the path to the font if it contains the table.
+* `-v`, `--invert-match` select fonts that don't have the given table
 
 #### Example
 
@@ -189,9 +191,9 @@ variable font to produce a static, non-variable font with those settings.
 
 #### Options
 
-* `-t, --tuple` is a comma separated list of values one for each variation axis
+* `-t`, `--tuple` is a comma separated list of values one for each variation axis
   of the font. The `variations` tool will list the axes, their order, and limits.
-* `-o, --output` is the path to the output font.
+* `-o`, `--output` is the path to the output font.
 
 #### Example
 
@@ -259,9 +261,9 @@ the source font only containing the glyphs required for the supplied text.
 
 #### Options
 
-`-t`, `--text TEXT` subset the font to include glyphs from TEXT
-`-a`, `--all` include all glyphs in the subset font
-`-i`, `--index INDEX` index of the font to subset (for TTC, WOFF2) (default: 0)
+* `-t`, `--text TEXT` subset the font to include glyphs from TEXT
+* `-a`, `--all` include all glyphs in the subset font
+* `-i`, `--index INDEX` index of the font to subset (for TTC, WOFF2) (default: 0)
 
 #### Example
 
