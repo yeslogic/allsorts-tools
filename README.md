@@ -197,7 +197,7 @@ variable font to produce a static, non-variable font with those settings.
 In this example the font has two axes: `UNDO` and `UNDS`. We supply a value of
 500 for each one and write the output font to `UnderlineTest.ttf`.
 
-    allsorts --tuple 500,500 UnderlineTest-VF.ttf -o UnderlineTest.ttf
+    allsorts instance --tuple 500,500 UnderlineTest-VF.ttf -o UnderlineTest.ttf
 
 ### `layout-features`
 
@@ -273,7 +273,7 @@ large repertoire of real world fonts.
 The `variations` tool lists information about a variable font. The information
 includes:
 
-- The variation axes and their tag, minimum, maximum, and default values.
+- The variation axes with their tag, minimum, maximum, and default values.
 - Any pre-defined instances and their name and axis values.
 
 #### Example

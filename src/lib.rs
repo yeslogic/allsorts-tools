@@ -41,7 +41,7 @@ impl fmt::Display for ErrorMessage {
 
 impl Error for ErrorMessage {}
 
-/// Decode a non-utf-8 string to a UTF-8 Rust string.
+/// Decode a non-UTF-8 string to a UTF-8 Rust string.
 pub(crate) fn decode(encoding: &'static Encoding, data: &[u8]) -> String {
     let mut decoder = encoding.new_decoder();
     if let Some(size) = decoder.max_utf8_buffer_length(data.len()) {
