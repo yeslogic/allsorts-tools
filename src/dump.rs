@@ -136,7 +136,7 @@ fn dump_ttf<'a>(
 
         if table_record.table_tag == tag::MAXP {
             let maxp = table.read::<MaxpTable>()?;
-            println!(" - num_glpyhs: {}", maxp.num_glyphs);
+            println!(" - num_glyphs: {}", maxp.num_glyphs);
         }
     }
     if let Some(cff_table_data) = ttf.read_table(scope, tag::CFF)? {
