@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::iter;
 use std::str::FromStr;
 
 use allsorts::cff::CFF;
@@ -187,7 +188,7 @@ pub enum SVGMode {
     View {
         mark_origin: bool,
         margin: Margin,
-        fg: Option<Colour>,
+        fg: Vec<Colour>,
         bg: Option<Colour>,
     },
 }
@@ -196,6 +197,7 @@ pub struct SVGWriter {
     mode: SVGMode,
     transform: Matrix2x2F,
     usage: Vec<(usize, Vector2F)>,
+    fg_colour: Box<dyn Iterator<Item = Colour>>,
 }
 
 struct Symbols<'info> {
@@ -208,10 +210,18 @@ struct Symbols<'info> {
 
 impl SVGWriter {
     pub fn new(mode: SVGMode, transform: Matrix2x2F) -> Self {
+        let fg_colour = match &mode {
+            SVGMode::TextRenderingTests(_) => {
+                Box::new(iter::empty()) as Box<dyn Iterator<Item = Colour>>
+            }
+            SVGMode::View { fg, .. } => Box::new(fg.clone().into_iter().cycle()),
+        };
+
         SVGWriter {
             mode,
             transform,
             usage: Vec::new(),
+            fg_colour,
         }
     }
 
@@ -300,7 +310,7 @@ impl SVGWriter {
             .push((symbol_index, self.transform * vec2f(x, y)));
     }
 
-    fn end(self, x_max: f32, ascender: i16, descender: i16, symbols: Symbols) -> String {
+    fn end(mut self, x_max: f32, ascender: i16, descender: i16, symbols: Symbols) -> String {
         let mut w = XmlWriter::new(xmlwriter::Options::default());
         w.write_declaration();
         w.start_element("svg");
@@ -414,11 +424,8 @@ impl SVGWriter {
         }
     }
 
-    fn fg_colour(&self) -> Option<Colour> {
-        match self.mode {
-            SVGMode::TextRenderingTests(_) => None,
-            SVGMode::View { fg, .. } => fg,
-        }
+    fn fg_colour(&mut self) -> Option<Colour> {
+        self.fg_colour.next()
     }
 
     fn bg_colour(&self) -> Option<Colour> {

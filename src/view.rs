@@ -178,10 +178,15 @@ fn parse_features(features: &str) -> Features {
 
 impl From<&ViewOpts> for SVGMode {
     fn from(opts: &ViewOpts) -> Self {
+        let fg = if opts.fg_colour.is_empty() {
+            &opts.fg_color
+        } else {
+            &opts.fg_colour
+        };
         SVGMode::View {
             mark_origin: opts.mark_origin,
             margin: opts.margin.unwrap_or_default(),
-            fg: opts.fg_colour.or(opts.fg_color),
+            fg: fg.clone(),
             bg: opts.bg_colour.or(opts.bg_color),
         }
     }
