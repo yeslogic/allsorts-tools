@@ -367,10 +367,10 @@ pub struct ViewOpts {
 
     #[options(
         help = "set the fill colour of the glyphs",
-        meta = "rrggbbaa",
+        meta = "rrggbbaa...",
         no_short
     )]
-    pub fg_colour: Option<Colour>,
+    pub fg_colour: Vec<Colour>,
 
     #[options(
         help = "set the background colour of the generated SVG",
@@ -379,8 +379,8 @@ pub struct ViewOpts {
     )]
     pub bg_colour: Option<Colour>,
 
-    #[options(help = "alias for --fg-colour", meta = "rrggbbaa", no_short)]
-    pub fg_color: Option<Colour>,
+    #[options(help = "alias for --fg-colour", meta = "rrggbbaa...", no_short)]
+    pub fg_color: Vec<Colour>,
 
     #[options(help = "alias for --bg-colour", meta = "rrggbbaa", no_short)]
     pub bg_color: Option<Colour>,
