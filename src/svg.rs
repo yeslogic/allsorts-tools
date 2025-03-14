@@ -130,6 +130,20 @@ fn script_and_lang_from_testcase(opts: &SvgOpts) -> (u32, u32) {
             tag::from_string("lana").unwrap(),
             tag::from_string("THA ").unwrap(),
         )
+    } else if opts.testcase.starts_with("MORX-37")
+        || opts.testcase.starts_with("MORX-38")
+        || opts.testcase.starts_with("MORX-39")
+        || opts.testcase.starts_with("MORX-40")
+    {
+        // HACK: test input is a mix of Hebrew and English text, and is repeated for all four tests.
+        if opts.render.contains("ב") {
+            (
+                tag::from_string("hebr").unwrap(),
+                tag::from_string("IWR ").unwrap(),
+            )
+        } else {
+            (tag::LATN, tag::from_string("ENG ").unwrap())
+        }
     } else {
         (tag::LATN, tag::from_string("ENG ").unwrap())
     }
