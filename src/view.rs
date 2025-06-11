@@ -1,13 +1,13 @@
 use allsorts::binary::read::ReadScope;
+use allsorts::cff::outline::CFFOutlines;
 use allsorts::cff::CFF;
-use allsorts::error::ParseError;
 use allsorts::font::{Font, GlyphTableFlags, MatchingPresentation};
 use allsorts::font_data::FontData;
 use allsorts::gsub::{FeatureInfo, FeatureMask, Features, GlyphOrigin, RawGlyph, RawGlyphFlags};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
-use allsorts::tables::glyf::GlyfTable;
+use allsorts::tables::glyf::{GlyfVistorContext, LocaGlyf};
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::variable_fonts::OwnedTuple;
 use allsorts::tables::{FontTableProvider, SfntVersion};
@@ -87,7 +87,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     let provider = font_file.table_provider(0)?;
 
     // Turn each glyph into an SVG...
-    let head = font.head_table()?.ok_or(ParseError::MissingValue)?;
+    let head = &font.head_table;
     let scale = FONT_SIZE / f32::from(head.units_per_em);
     let transform = Matrix2x2F::from_scale(vec2f(scale, -scale));
     let mode = SVGMode::from(&opts);
@@ -95,23 +95,23 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
         && provider.sfnt_version() == tag::OTTO
     {
         let cff_data = provider.read_table_data(tag::CFF)?;
-        let mut cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
+        let cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
+        let mut cff_outlines = CFFOutlines { table: &cff };
         let writer = SVGWriter::new(mode, transform);
-        writer.glyphs_to_svg(&mut cff, &mut font, &infos, direction)?
+        writer.glyphs_to_svg(&mut cff_outlines, &mut font, &infos, direction)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
-        let loca = ReadScope::new(&loca_data).read_dep::<LocaTable<'_>>((
-            usize::from(font.maxp_table.num_glyphs),
-            head.index_to_loc_format,
-        ))?;
+        let loca = ReadScope::new(&loca_data)
+            .read_dep::<LocaTable<'_>>((font.maxp_table.num_glyphs, head.index_to_loc_format))?;
         let glyf_data = provider.read_table_data(tag::GLYF)?;
-        let glyf = ReadScope::new(&glyf_data).read_dep::<GlyfTable<'_>>(&loca)?;
+        let mut loca_glyf = LocaGlyf::loaded((&loca).into(), Box::from(glyf_data));
         let post_data = provider.table_data(tag::POST)?;
         let post = post_data
             .as_ref()
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
-        let mut glyf_post = NamedOutliner { table: glyf, post };
+        let ctx = GlyfVistorContext::new(&mut loca_glyf, None);
+        let mut glyf_post = NamedOutliner { table: ctx, post };
         let writer = SVGWriter::new(mode, transform);
         writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction)?
     } else {
