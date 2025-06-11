@@ -50,8 +50,7 @@ fn dump_glyphs(path: &str, provider: &impl FontTableProvider) -> Result<bool, Pa
     } else {
         let table = provider.table_data(tag::LOCA)?.expect("no loca table");
         let scope = ReadScope::new(table.borrow());
-        let loca = scope
-            .read_dep::<LocaTable>((usize::from(maxp.num_glyphs), head.index_to_loc_format))?;
+        let loca = scope.read_dep::<LocaTable>((maxp.num_glyphs, head.index_to_loc_format))?;
 
         let table = provider.table_data(tag::GLYF)?.expect("no glyf table");
         let scope = ReadScope::new(table.borrow());

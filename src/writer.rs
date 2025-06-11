@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::iter;
 use std::str::FromStr;
 
-use allsorts::cff::CFF;
+use allsorts::cff::outline::CFFOutlines;
 use allsorts::context::Glyph;
 use allsorts::glyph_position::{GlyphLayout, GlyphPosition, TextDirection};
 use allsorts::gpos::{Info, Placement};
@@ -14,6 +14,7 @@ use allsorts::pathfinder_geometry::line_segment::LineSegment2F;
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::{vec2f, Vector2F, Vector2I};
 use allsorts::post::PostTable;
+use allsorts::tables::variable_fonts::OwnedTuple;
 use allsorts::tables::FontTableProvider;
 use allsorts::Font;
 use xmlwriter::XmlWriter;
@@ -142,14 +143,14 @@ impl Display for ViewBox {
     }
 }
 
-impl<'a> GlyphName for CFF<'a> {
+impl<'a, 'data> GlyphName for CFFOutlines<'a, 'data> {
     fn gid_to_glyph_name(&self, glyph_id: u16) -> Option<String> {
-        let font = self.fonts.first()?;
+        let font = self.table.fonts.first()?;
         if font.is_cid_keyed() {
             return None;
         }
         let sid = font.charset.id_for_glyph(glyph_id)?;
-        self.read_string(sid).map(ToString::to_string).ok()
+        self.table.read_string(sid).map(ToString::to_string).ok()
     }
 }
 
@@ -171,9 +172,10 @@ where
     fn visit<V: OutlineSink>(
         &mut self,
         glyph_index: u16,
+        tuple: Option<&OwnedTuple>,
         visitor: &mut V,
     ) -> Result<(), Self::Error> {
-        self.table.visit(glyph_index, visitor)
+        self.table.visit(glyph_index, tuple, visitor)
     }
 }
 
@@ -283,7 +285,7 @@ impl SVGWriter {
                     .unwrap_or_else(|| format!("gid{}", glyph_index));
                 let symbol_index = symbols.new_glyph(glyph_name, info);
                 symbol_map.insert(glyph_index, symbol_index);
-                builder.visit(glyph_index, &mut symbols)?;
+                builder.visit(glyph_index, None, &mut symbols)?;
                 if self.annotate() {
                     symbols.annotate(symbol_index, pos.x_offset as f32, pos.y_offset as f32);
                 }

@@ -253,7 +253,7 @@ fn dump_woff2<'a>(
         let loca = loca_entry.read_table(&woff.table_data_block_scope())?;
         let loca = loca.scope().read_dep::<Woff2LocaTable>((
             loca_entry,
-            usize::from(maxp.num_glyphs),
+            maxp.num_glyphs,
             head.index_to_loc_format,
         ))?;
         let glyf = table.scope().read_dep::<Woff2GlyfTable>((entry, &loca))?;
@@ -356,8 +356,7 @@ fn dump_loca_table(provider: &impl FontTableProvider) -> Result<(), ParseError> 
 
     let table = provider.table_data(tag::LOCA)?.expect("no loca table");
     let scope = ReadScope::new(table.borrow());
-    let loca =
-        scope.read_dep::<LocaTable>((usize::from(maxp.num_glyphs), head.index_to_loc_format))?;
+    let loca = scope.read_dep::<LocaTable>((maxp.num_glyphs, head.index_to_loc_format))?;
 
     println!("loca:");
     for (glyph_id, offset) in loca.offsets.iter().enumerate() {
@@ -473,8 +472,7 @@ fn dump_glyph(provider: &impl FontTableProvider, glyph_id: u16) -> Result<(), Pa
 
     let table = provider.table_data(tag::LOCA)?.expect("no loca table");
     let scope = ReadScope::new(table.borrow());
-    let loca =
-        scope.read_dep::<LocaTable>((usize::from(maxp.num_glyphs), head.index_to_loc_format))?;
+    let loca = scope.read_dep::<LocaTable>((maxp.num_glyphs, head.index_to_loc_format))?;
 
     let table = provider.table_data(tag::GLYF)?.expect("no glyf table");
     let scope = ReadScope::new(table.borrow());
