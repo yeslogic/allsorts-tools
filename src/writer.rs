@@ -223,6 +223,7 @@ impl SVGWriter {
         font: &mut Font<F>,
         infos: &[Info],
         direction: TextDirection,
+        tuple: Option<&OwnedTuple>,
     ) -> Result<String, BoxError>
     where
         T: OutlineBuilder + GlyphName,
@@ -232,8 +233,8 @@ impl SVGWriter {
         let glyph_positions = layout.glyph_positions()?;
         let iter = infos.iter().zip(glyph_positions.iter().copied());
         let svg = match direction {
-            TextDirection::LeftToRight => self.glyphs_to_svg_impl(builder, font, iter),
-            TextDirection::RightToLeft => self.glyphs_to_svg_impl(builder, font, iter.rev()),
+            TextDirection::LeftToRight => self.glyphs_to_svg_impl(builder, font, tuple, iter),
+            TextDirection::RightToLeft => self.glyphs_to_svg_impl(builder, font, tuple, iter.rev()),
         }
         .map_err(|err| format!("error building SVG: {}", err))?;
         Ok(svg)
@@ -243,6 +244,7 @@ impl SVGWriter {
         mut self,
         builder: &mut T,
         font: &mut Font<F>,
+        tuple: Option<&OwnedTuple>,
         iter: I,
     ) -> Result<String, T::Error>
     where
@@ -275,7 +277,7 @@ impl SVGWriter {
                     .unwrap_or_else(|| format!("gid{}", glyph_index));
                 let symbol_index = symbols.new_glyph(glyph_name, info);
                 symbol_map.insert(glyph_index, symbol_index);
-                builder.visit(glyph_index, None, &mut symbols)?;
+                builder.visit(glyph_index, tuple, &mut symbols)?;
                 if self.annotate() {
                     symbols.annotate(symbol_index, pos.x_offset as f32, pos.y_offset as f32);
                 }

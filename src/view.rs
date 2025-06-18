@@ -7,7 +7,9 @@ use allsorts::gsub::{FeatureInfo, FeatureMask, Features, GlyphOrigin, RawGlyph, 
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
-use allsorts::tables::glyf::{GlyfVistorContext, LocaGlyf};
+use allsorts::tables::glyf::{
+    GlyfVisitorContext, LocaGlyf, VariableGlyfContext, VariableGlyfContextStore,
+};
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::variable_fonts::OwnedTuple;
 use allsorts::tables::{FontTableProvider, SfntVersion};
@@ -98,7 +100,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
         let cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
         let mut cff_outlines = CFFOutlines { table: &cff };
         let writer = SVGWriter::new(mode, transform);
-        writer.glyphs_to_svg(&mut cff_outlines, &mut font, &infos, direction)?
+        writer.glyphs_to_svg(&mut cff_outlines, &mut font, &infos, direction, None)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
         let loca = ReadScope::new(&loca_data)
@@ -110,10 +112,12 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
             .as_ref()
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
-        let ctx = GlyfVistorContext::new(&mut loca_glyf, None);
+        let store = VariableGlyfContextStore::read(&provider)?;
+        let var_ctx = VariableGlyfContext::new(&store)?;
+        let ctx = GlyfVisitorContext::new(&mut loca_glyf, Some(var_ctx));
         let mut glyf_post = NamedOutliner { table: ctx, post };
         let writer = SVGWriter::new(mode, transform);
-        writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction)?
+        writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction, tuple.as_ref())?
     } else {
         eprintln!("no glyf or CFF table");
         return Ok(1);
