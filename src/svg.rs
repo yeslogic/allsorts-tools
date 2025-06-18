@@ -11,7 +11,7 @@ use allsorts::gsub::{FeatureMask, Features};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
-use allsorts::tables::glyf::{GlyfVistorContext, LocaGlyf};
+use allsorts::tables::glyf::{GlyfVisitorContext, LocaGlyf};
 use allsorts::tables::loca::LocaTable;
 use allsorts::tables::variable_fonts::fvar::FvarTable;
 use allsorts::tables::variable_fonts::OwnedTuple;
@@ -66,7 +66,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
         let cff = ReadScope::new(&cff_data).read::<CFF<'_>>()?;
         let mut cff_outlines = CFFOutlines { table: &cff };
         let writer = SVGWriter::new(SVGMode::TextRenderingTests(opts.testcase), transform);
-        writer.glyphs_to_svg(&mut cff_outlines, &mut font, &infos, direction)?
+        writer.glyphs_to_svg(&mut cff_outlines, &mut font, &infos, direction, None)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::CFF2)
         && provider.sfnt_version() == tag::OTTO
     {
@@ -84,7 +84,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             post,
         };
         let writer = SVGWriter::new(SVGMode::TextRenderingTests(opts.testcase), transform);
-        writer.glyphs_to_svg(&mut cff2_post, &mut font, &infos, direction)?
+        writer.glyphs_to_svg(&mut cff2_post, &mut font, &infos, direction, None)?
     } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
         let loca = ReadScope::new(&loca_data)
@@ -96,11 +96,11 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             .as_ref()
             .map(|data| ReadScope::new(data).read::<PostTable<'_>>())
             .transpose()?;
-        let ctx = GlyfVistorContext::new(&mut loca_glyf, None);
+        let ctx = GlyfVisitorContext::new(&mut loca_glyf, None);
 
         let mut glyf_post = NamedOutliner { table: ctx, post };
         let writer = SVGWriter::new(SVGMode::TextRenderingTests(opts.testcase), transform);
-        writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction)?
+        writer.glyphs_to_svg(&mut glyf_post, &mut font, &infos, direction, None)?
     } else {
         eprintln!("no glyf or CFF table");
         return Ok(1);
