@@ -167,6 +167,7 @@ impl<'a, T> OutlineBuilder for NamedOutliner<'a, T>
 where
     T: OutlineBuilder,
 {
+    type Output = T::Output;
     type Error = T::Error;
 
     fn visit<V: OutlineSink>(
@@ -174,7 +175,7 @@ where
         glyph_index: u16,
         tuple: Option<&OwnedTuple>,
         visitor: &mut V,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<Self::Output, Self::Error> {
         self.table.visit(glyph_index, tuple, visitor)
     }
 }
