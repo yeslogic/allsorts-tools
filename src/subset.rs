@@ -7,6 +7,7 @@ use allsorts::binary::read::ReadScope;
 use allsorts::font::read_cmap_subtable;
 use allsorts::font_data::FontData;
 use allsorts::gsub::{GlyphOrigin, RawGlyph, RawGlyphFlags};
+use allsorts::subset::{CmapTarget, SubsetProfile};
 use allsorts::tables::cmap::Cmap;
 use allsorts::tables::{FontTableProvider, MaxpTable};
 use allsorts::tinyvec::tiny_vec;
@@ -40,7 +41,9 @@ fn subset_all<F: FontTableProvider>(font_provider: &F, output_path: &str) -> Res
     let maxp = scope.read::<MaxpTable>()?;
 
     let glyph_ids = (0..maxp.num_glyphs).collect::<Vec<_>>();
-    let new_font = subset::subset(font_provider, &glyph_ids)?;
+    let profile = SubsetProfile::Minimal;
+    let cmap_target = CmapTarget::Unicode;
+    let new_font = subset::subset(font_provider, &glyph_ids, &profile, cmap_target)?;
 
     // Write out the new font
     let mut output = File::create(output_path)?;
@@ -81,7 +84,9 @@ fn subset_text<F: FontTableProvider>(
     println!("Number of glyphs in new font: {}", glyph_ids.len());
 
     // Subset
-    let new_font = subset::subset(font_provider, &glyph_ids)?;
+    let profile = SubsetProfile::Minimal;
+    let cmap_target = CmapTarget::Unicode;
+    let new_font = subset::subset(font_provider, &glyph_ids, &profile, cmap_target)?;
 
     // Write out the new font
     let mut output = File::create(output_path)?;
