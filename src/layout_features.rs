@@ -35,11 +35,11 @@ fn print_layout_features<T>(layout_table: &LayoutTable<T>) -> Result<(), BoxErro
             println!("  Script: {}", DisplayTag(script_record.script_tag));
             if let Some(default_langsys) = script_table.default_langsys_record() {
                 println!("    Language: default");
-                print_features(&layout_table, &default_langsys)?;
+                print_features(layout_table, default_langsys)?;
             }
             for langsys in script_table.langsys_records() {
                 println!("    Language: {}", DisplayTag(langsys.langsys_tag));
-                print_features(&layout_table, langsys.langsys_table())?;
+                print_features(layout_table, langsys.langsys_table())?;
             }
         }
     }

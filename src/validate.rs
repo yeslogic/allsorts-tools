@@ -77,7 +77,7 @@ fn check_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     if cff.name_index.len() != 1 {
         return Err(ParseError::BadIndex);
     }
-    let font = cff.fonts.get(0).ok_or(ParseError::MissingValue)?;
+    let font = cff.fonts.first().ok_or(ParseError::MissingValue)?;
     let char_strings_offset = font
         .top_dict
         .get_i32(Operator::CharStrings)
@@ -88,7 +88,7 @@ fn check_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     match &font.data {
         CFFVariant::Type1(ref _type1) => {}
         CFFVariant::CID(cid) => {
-            for (_i, object) in cid.font_dict_index.iter().enumerate() {
+            for object in cid.font_dict_index.iter() {
                 let font_dict = ReadScope::new(object).read_dep::<FontDict>(cff::MAX_OPERANDS)?;
                 let (_private_dict, _private_dict_offset) =
                     font_dict.read_private_dict::<cff::PrivateDict>(&scope, cff::MAX_OPERANDS)?;
