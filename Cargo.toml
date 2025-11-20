@@ -16,7 +16,7 @@ png = "0.15.3"
 xmlwriter = "0.1.0"
 
 [dependencies.allsorts]
-version = "0.15.0"
+version = "0.16.0"
 features = ["specimen"]
 
 [dev-dependencies]
