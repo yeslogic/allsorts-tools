@@ -159,7 +159,7 @@ fn dump_woff(woff: &WoffFont<'_>, tag: Option<Tag>, flags: Flags) -> Result<(), 
         if let Some(entry) = woff.table_directory.iter().find(|entry| entry.tag == tag) {
             let table = entry.read_table(&woff.scope)?;
 
-            return dump_raw_table(Some(table.scope().clone()));
+            return dump_raw_table(Some(table.scope()));
         } else {
             eprintln!("Table {} not found", DisplayTag(tag));
         }
@@ -379,7 +379,7 @@ fn dump_cff_table<'a>(scope: ReadScope<'a>) -> Result<(), ParseError> {
     if cff.name_index.len() != 1 {
         return Err(ParseError::BadIndex);
     }
-    let font = cff.fonts.get(0).ok_or(ParseError::MissingValue)?;
+    let font = cff.fonts.first().ok_or(ParseError::MissingValue)?;
     let char_strings_index = &font.char_strings_index;
     println!(" - num glyphs: {}", char_strings_index.len());
     println!(

@@ -57,14 +57,14 @@ impl FromStr for Margin {
             .map(|part| part.parse())
             .collect::<Result<Vec<f32>, _>>()
             .map_err(|err| err.to_string())?;
-        match parts.as_slice() {
-            &[top, right, bottom, left] => Ok(Margin {
+        match *parts.as_slice() {
+            [top, right, bottom, left] => Ok(Margin {
                 top,
                 right,
                 bottom,
                 left,
             }),
-            &[num] => Ok(Margin {
+            [num] => Ok(Margin {
                 top: num,
                 right: num,
                 bottom: num,

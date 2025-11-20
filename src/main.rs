@@ -66,5 +66,5 @@ fn usage() -> ! {
 }
 
 fn arg_starts_with(arg: &OsStr, prefix: &str) -> bool {
-    arg.to_str().map_or(false, |s| s.starts_with(prefix))
+    arg.to_str().is_some_and(|s| s.starts_with(prefix))
 }

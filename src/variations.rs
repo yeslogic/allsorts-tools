@@ -133,12 +133,12 @@ fn generate_test(provider: &DynamicFontTableProvider, font: &str) -> Result<(), 
         let instance = instance?;
         let subfamily = name
             .string_for_id(instance.subfamily_name_id)
-            .ok_or_else(|| "instance has no subfamily name")?;
+            .ok_or("instance has no subfamily name")?;
         let font_family = format!("{typographic_family} {subfamily}");
         let src = Path::new(font)
             .file_name()
             .and_then(|src| src.to_str())
-            .ok_or_else(|| "unable to get filename of font")?;
+            .ok_or("unable to get filename of font")?;
         let font_face = font_face(&axes, &font_family, src, &instance);
         writeln!(out, "{font_face}")?;
 

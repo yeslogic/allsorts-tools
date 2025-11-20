@@ -36,7 +36,7 @@ pub fn main(opts: BitmapOpts) -> Result<i32, BoxError> {
 
         match font.lookup_glyph_image(glyph_id, opts.size, BitDepth::ThirtyTwo)? {
             Some(bitmap) => {
-                let strike_path = output_path.join(&format!(
+                let strike_path = output_path.join(format!(
                     "{}x{}",
                     bitmap.ppem_x.unwrap_or(0),
                     bitmap.ppem_y.unwrap_or(0)
@@ -59,7 +59,7 @@ pub fn main(opts: BitmapOpts) -> Result<i32, BoxError> {
 fn dump_bitmap(path: &Path, glyph_id: u16, bitmap: &BitmapGlyph) -> Result<(), BoxError> {
     match &bitmap.bitmap {
         Bitmap::Embedded(embedded) => {
-            let glyph_path = path.join(&format!("{}.png", glyph_id));
+            let glyph_path = path.join(format!("{}.png", glyph_id));
             let file = File::create(&glyph_path)?;
             let w = BufWriter::new(file);
             let mut encoder =
@@ -88,7 +88,7 @@ fn dump_bitmap(path: &Path, glyph_id: u16, bitmap: &BitmapGlyph) -> Result<(), B
                 EncapsulatedFormat::Other(format) => Cow::from(DisplayTag(format).to_string()),
             };
 
-            let glyph_path = path.join(&format!("{}.{}", glyph_id, extension.trim_end()));
+            let glyph_path = path.join(format!("{}.{}", glyph_id, extension.trim_end()));
             fs::write(glyph_path, &encapsulated.data)?;
         }
     }

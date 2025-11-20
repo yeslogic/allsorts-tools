@@ -28,7 +28,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     let lang = opts
         .lang
         .as_deref()
-        .map(|s| tag::from_string(&s).expect("invalid language tag"));
+        .map(|s| tag::from_string(s).expect("invalid language tag"));
 
     match (&opts.text, &opts.codepoints, &opts.indices) {
         (Some(_), None, None) | (None, Some(_), None) | (None, None, Some(_)) => {}
@@ -39,7 +39,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     }
 
     let features = match opts.features {
-        Some(ref features) => parse_features(&features),
+        Some(ref features) => parse_features(features),
         None => Features::Mask(FeatureMask::default()),
     };
 
@@ -63,12 +63,12 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     let mut font = Font::new(provider)?;
 
     let glyphs = if let Some(ref text) = opts.text {
-        font.map_glyphs(&text, script, MatchingPresentation::NotRequired)
+        font.map_glyphs(text, script, MatchingPresentation::NotRequired)
     } else if let Some(ref codepoints) = opts.codepoints {
-        let text = parse_codepoints(&codepoints);
+        let text = parse_codepoints(codepoints);
         font.map_glyphs(&text, script, MatchingPresentation::NotRequired)
     } else if let Some(ref indices) = opts.indices {
-        parse_glyph_indices(&indices)
+        parse_glyph_indices(indices)
     } else {
         panic!("expected --text OR --codepoints OR --indices");
     };
@@ -138,7 +138,7 @@ fn parse_codepoints(codepoints: &str) -> String {
 
 fn hex_string_to_char(hex: &str) -> char {
     let i = u32::from_str_radix(hex, 16)
-        .expect(format!("failed to parse hex string '{}'", hex).as_str());
+        .unwrap_or_else(|_| panic!("failed to parse hex string '{}'", hex));
     std::char::from_u32(i).unwrap_or('\u{FFFD}')
 }
 
@@ -152,7 +152,8 @@ fn parse_glyph_indices(glyph_indices: &str) -> Vec<RawGlyph<()>> {
 }
 
 fn string_to_u16(s: &str) -> u16 {
-    u16::from_str_radix(s, 10).expect(format!("failed to parse u16 string '{}'", s).as_str())
+    s.parse::<u16>()
+        .unwrap_or_else(|_| panic!("failed to parse u16 string '{}'", s))
 }
 
 fn make_raw_glyph(glyph_index: u16) -> RawGlyph<()> {
@@ -171,7 +172,7 @@ fn parse_features(features: &str) -> Features {
     let feature_infos = features
         .split(',')
         .map(str::trim)
-        .map(|s| tag::from_string(s).expect(format!("invalid feature '{}'", s).as_str()))
+        .map(|s| tag::from_string(s).unwrap_or_else(|_| panic!("invalid feature '{}'", s)))
         .map(|f| FeatureInfo {
             feature_tag: f,
             alternate: None,
