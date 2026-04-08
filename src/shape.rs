@@ -2,7 +2,7 @@ use allsorts::binary::read::ReadScope;
 use allsorts::font::{Font, MatchingPresentation};
 use allsorts::font_data::FontData;
 use allsorts::glyph_position::{GlyphLayout, TextDirection};
-use allsorts::gsub::{FeatureMask, Features};
+use allsorts::gsub::{FeatureMask, FeatureMaskExt};
 use allsorts::tables::variable_fonts::OwnedTuple;
 use allsorts::tag;
 
@@ -36,7 +36,8 @@ pub fn main(opts: ShapeOpts) -> Result<i32, BoxError> {
             glyphs,
             script,
             Some(lang),
-            &Features::Mask(FeatureMask::default()),
+            FeatureMask::default_mask(),
+            &[],
             tuple.as_ref().map(OwnedTuple::as_tuple),
             true,
         )

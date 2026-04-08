@@ -5,9 +5,9 @@ use allsorts::binary::read::ReadScope;
 use allsorts::cff::cff2::CFF2;
 use allsorts::cff::outline::{CFF2Outlines, CFFOutlines};
 use allsorts::cff::CFF;
-use allsorts::font::{GlyphTableFlags, MatchingPresentation};
+use allsorts::font::{GlyphTableFlag, MatchingPresentation};
 use allsorts::font_data::{DynamicFontTableProvider, FontData};
-use allsorts::gsub::{FeatureMask, Features};
+use allsorts::gsub::{FeatureMask, FeatureMaskExt};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
@@ -41,7 +41,8 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
             glyphs,
             script,
             Some(lang),
-            &Features::Mask(FeatureMask::default()),
+            FeatureMask::default_mask(),
+            &[],
             tuple.as_ref().map(OwnedTuple::as_tuple),
             true,
         )
@@ -59,7 +60,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
     } else {
         Matrix2x2F::from_scale(scale)
     };
-    let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF)
+    let svg = if font.glyph_table_flags.contains(GlyphTableFlag::CFF)
         && provider.sfnt_version() == tag::OTTO
     {
         let cff_data = provider.read_table_data(tag::CFF)?;
@@ -67,7 +68,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
         let mut cff_outlines = CFFOutlines { table: &cff };
         let writer = SVGWriter::new(SVGMode::TextRenderingTests(opts.testcase), transform);
         writer.glyphs_to_svg(&mut cff_outlines, &mut font, &infos, direction, None)?
-    } else if font.glyph_table_flags.contains(GlyphTableFlags::CFF2)
+    } else if font.glyph_table_flags.contains(GlyphTableFlag::CFF2)
         && provider.sfnt_version() == tag::OTTO
     {
         let cff_data = provider.read_table_data(tag::CFF2)?;
@@ -85,7 +86,7 @@ pub fn main(opts: SvgOpts) -> Result<i32, BoxError> {
         };
         let writer = SVGWriter::new(SVGMode::TextRenderingTests(opts.testcase), transform);
         writer.glyphs_to_svg(&mut cff2_post, &mut font, &infos, direction, None)?
-    } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
+    } else if font.glyph_table_flags.contains(GlyphTableFlag::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
         let loca = ReadScope::new(&loca_data)
             .read_dep::<LocaTable<'_>>((font.maxp_table.num_glyphs, head.index_to_loc_format))?;
