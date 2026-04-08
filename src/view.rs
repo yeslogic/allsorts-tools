@@ -1,9 +1,11 @@
 use allsorts::binary::read::ReadScope;
 use allsorts::cff::outline::CFFOutlines;
 use allsorts::cff::CFF;
-use allsorts::font::{Font, GlyphTableFlags, MatchingPresentation};
+use allsorts::font::{Font, GlyphTableFlag, MatchingPresentation};
 use allsorts::font_data::FontData;
-use allsorts::gsub::{FeatureInfo, FeatureMask, Features, GlyphOrigin, RawGlyph, RawGlyphFlags};
+use allsorts::gsub::{
+    FeatureInfo, FeatureMask, FeatureMaskExt, GlyphOrigin, RawGlyph, RawGlyphFlags,
+};
 use allsorts::pathfinder_geometry::transform2d::Matrix2x2F;
 use allsorts::pathfinder_geometry::vector::vec2f;
 use allsorts::post::PostTable;
@@ -40,7 +42,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
 
     let features = match opts.features {
         Some(ref features) => parse_features(features),
-        None => Features::Mask(FeatureMask::default()),
+        None => Vec::new(),
     };
 
     let buffer = std::fs::read(&opts.font)?;
@@ -78,6 +80,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
             glyphs,
             script,
             lang,
+            FeatureMask::default_mask(),
             &features,
             tuple.as_ref().map(OwnedTuple::as_tuple),
             true,
@@ -93,7 +96,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
     let scale = FONT_SIZE / f32::from(head.units_per_em);
     let transform = Matrix2x2F::from_scale(vec2f(scale, -scale));
     let mode = SVGMode::from(&opts);
-    let svg = if font.glyph_table_flags.contains(GlyphTableFlags::CFF)
+    let svg = if font.glyph_table_flags.contains(GlyphTableFlag::CFF)
         && provider.sfnt_version() == tag::OTTO
     {
         let cff_data = provider.read_table_data(tag::CFF)?;
@@ -101,7 +104,7 @@ pub fn main(opts: ViewOpts) -> Result<i32, BoxError> {
         let mut cff_outlines = CFFOutlines { table: &cff };
         let writer = SVGWriter::new(mode, transform);
         writer.glyphs_to_svg(&mut cff_outlines, &mut font, &infos, direction, None)?
-    } else if font.glyph_table_flags.contains(GlyphTableFlags::GLYF) {
+    } else if font.glyph_table_flags.contains(GlyphTableFlag::GLYF) {
         let loca_data = provider.read_table_data(tag::LOCA)?;
         let loca = ReadScope::new(&loca_data)
             .read_dep::<LocaTable<'_>>((font.maxp_table.num_glyphs, head.index_to_loc_format))?;
@@ -168,8 +171,8 @@ fn make_raw_glyph(glyph_index: u16) -> RawGlyph<()> {
     }
 }
 
-fn parse_features(features: &str) -> Features {
-    let feature_infos = features
+fn parse_features(features: &str) -> Vec<FeatureInfo> {
+    features
         .split(',')
         .map(str::trim)
         .map(|s| tag::from_string(s).unwrap_or_else(|_| panic!("invalid feature '{}'", s)))
@@ -177,8 +180,7 @@ fn parse_features(features: &str) -> Features {
             feature_tag: f,
             alternate: None,
         })
-        .collect();
-    Features::Custom(feature_infos)
+        .collect()
 }
 
 impl From<&ViewOpts> for SVGMode {
